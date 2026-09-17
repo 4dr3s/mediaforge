@@ -157,7 +157,56 @@ findings are recorded with what was done about each one.
 
 ## Evidence log
 
-Empty until 1.1 runs.
+Raw output, appended as each task closes. Verbatim, not paraphrased.
+
+### 1.1 — RED: the schema contract suite (2026-09-17)
+
+```text
+$ pnpm --filter api --fail-if-no-match exec vitest run test/schema.spec.ts
+
+ test/schema.spec.ts (11 tests | 11 failed) 262ms
+   × schema :: tables exist > creates exactly the six tables of the ERD
+     → expected [] to deeply equal [ 'artifacts', 'attempts', …(4) ]
+   × schema :: the six states, and no seventh > types jobs.state as an enum whose labels are exactly the six canonical states
+     → jobs.state is missing: expected undefined to be defined
+   × schema :: uniqueness is enforced, and by the engine > declares the four unique column sets the ERD requires
+     → expected [] to deeply equally contain [ 'job_id', 'ordinal' ]
+   × schema :: uniqueness is enforced, and by the engine > rejects a duplicate (job_id, ordinal) with a real unique violation
+     → relation "jobs" does not exist
+   × schema :: no counter column on jobs > has exactly the ERD columns, and none of them is a counter
+     → expected [] to deeply equal [ 'id', 'job_type', 'params', …(6) ]
+   × schema :: no counter column on jobs > keeps attempts as rows: the table exists and is keyed per attempt
+     → expected [] to deeply equal [ 'id', 'job_id', 'attempt_no', …(7) ]
+   × schema :: ids are database-minted > defaults every primary key to uuidv7() except artifacts.id
+     → .toMatch() expects to receive a string, but got undefined
+   × schema :: the partial index the relay poll needs > indexes outbox (published_at) WHERE published_at IS NULL
+     → no partial outbox index; found:
+   × schema :: CHECK constraints Prisma cannot express > constrains ordinal, attempt_no and error_class
+     → expected '' to match /ordinal\s*>=\s*1/
+   × schema :: types are the ones the model declares > uses timestamptz, bigint and jsonb where the ERD says so
+     → expected undefined to be 'jsonb'
+   × schema :: every foreign key is indexed > has an index whose leading column is each foreign-key column
+     → expected 0 to be greater than 0
+
+ Test Files  1 failed (1)
+      Tests  11 failed (11)
+[exit=1]
+```
+
+**Why this is the right red.** Ten of the eleven fail because the catalog is empty, and the eleventh
+because the behavioral insert found no table (`relation "jobs" does not exist`). None failed on a
+syntax or type error inside the test file. That distinction is the whole point of recording a RED
+run: a malformed test also fails, and that failure would prove nothing about the schema.
+
+**A plumbing artifact worth recording.** A second run piped through `head -30` printed `exit=0`. That
+number came from the truncated pipe, not from a green suite — the authoritative exit code is the
+first run's `1`, taken without truncation. It is defect D1 in miniature: a status produced by the
+plumbing is not evidence about the thing being measured.
+
+**Linter advisory, not actioned.** pi-lens reported a **stale** knip finding for
+`apps/api/package.json`: `Unused devDependency @nestjs/schematics`. That package is not in the
+manifest (checked directly), so the finding does not reproduce and nothing was changed to silence
+it — the same disposition as findings F4/F5 in `repo-hygiene.md`.
 
 ## Out of scope
 
