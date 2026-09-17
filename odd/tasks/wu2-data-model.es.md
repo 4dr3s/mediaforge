@@ -6,8 +6,11 @@
 > está traducido es la prosa.
 
 **Workflow:** Organic Driven Development (ODD).
-**Fuente de verdad de los requisitos:** `openspec/changes/audio-extract-vertical-slice/` (intacto).
-**Estado:** `en curso` — creada el 2026-09-17.
+**Fuente de verdad de los requisitos:** `openspec/changes/audio-extract-vertical-slice/` — tratada como
+solo-lectura salvo donde el supervisor pidió una corrección; `design.md` §3/§5 y el requisito de
+idempotencia de C1 se enmendaron el 2026-09-17 (tarea 1.8), cada uno con una nota fechada.
+**Estado:** `cerrada` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
+forma independiente.
 
 ---
 
@@ -818,3 +821,37 @@ re-medida**.
   que esta unidad pueda tomar.
 - La copia de lectura `.es.md` se genera al cierre, en sync, con bloques de código idénticos byte a
   byte.
+
+---
+
+## Cierre (2026-09-17)
+
+**Qué se entregó.** El modelo de datos autoritativo como una sola migración: seis tablas, tres tipos
+enum (`JobState`, `FailureClass`, `OutboxEventType`), seis claves foráneas, los cuatro uniques incluido
+el de idempotencia global, dos constraints CHECK, el índice parcial del outbox, y los dos roles de
+privilegio mínimo con sus grants y `PUBLIC` revocado. Una sola autoridad DDL, editada a mano donde
+Prisma no puede expresar la constraint, y el worker no emite DDL.
+
+**Los gates, como están:**
+
+```text
+$ pnpm test:api     -> 24 passed (2 harness + 22 schema)   [exit=0]
+$ pnpm test:worker  -> 14 passed                          [exit=0]
+$ prisma migrate diff --from-config-datasource --to-schema --exit-code -> No difference detected [exit=0]
+```
+
+**Qué cambió la medición en el camino**, porque la lista es el registro honesto del trabajo: el ERD y
+el SQL canónico del propio diseño no coincidían sobre los defaults (tres columnas, resuelto a favor del
+SQL); el diseño afirmaba que Prisma no puede expresar un enum, y sí puede; `client_id` no tenía origen
+definido y su mitad nullable hacía que la constraint de idempotencia no hiciera cumplir nada; la suite
+RED admitía un esquema incorrecto que pasaba todas las aserciones; los comandos canónicos de test no
+corrían las suites que decían gatear; el cliente generado quedó viejo sin que un solo test lo notara; y
+la afirmación de esta propia feature de que O2 estaba satisfecha fue refutada por un verificador y
+después satisfecha de verdad.
+
+**Residuo:** ninguno en esta feature. Dieciocho commits en `feat/wu2-data-model`, ninguno pusheado — la
+entrega es decisión del supervisor, como siempre.
+
+**Siguiente:** WU-3 (el contrato compartido de dispatch TS↔Python). Es la primera unidad que va a
+importar el cliente de Prisma generado, así que cualquier build que compile la API tiene que correr
+`prisma generate` primero — la imagen de Docker todavía no lo hace porque nada lo necesitaba.

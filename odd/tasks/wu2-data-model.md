@@ -4,8 +4,10 @@
 > byte-identical to this file; if they diverge, the English is canonical.
 
 **Workflow:** Organic Driven Development (ODD).
-**Requirements source of truth:** `openspec/changes/audio-extract-vertical-slice/` (read-only here).
-**Status:** `in progress` — created 2026-09-17.
+**Requirements source of truth:** `openspec/changes/audio-extract-vertical-slice/` — treated as
+read-only except where the supervisor asked for a correction; `design.md` §3/§5 and the C1
+idempotency requirement were amended on 2026-09-17 (task 1.8), each with a dated note.
+**Status:** `closed` 2026-09-17 — tasks 1.1 to 1.8 complete, every work unit verified independently.
 
 ---
 
@@ -781,3 +783,36 @@ the NULL-distinct reasoning. The honest state of that claim is **corroborated, n
   are named as forbidden by the specs or the design, and none of them is a shortcut this unit may
   take.
 - The `.es.md` reading copy is generated at closure, in sync, with byte-identical code blocks.
+
+---
+
+## Closure (2026-09-17)
+
+**What shipped.** The authoritative data model as one migration: six tables, three enum types
+(`JobState`, `FailureClass`, `OutboxEventType`), six foreign keys, the four uniques including a
+globally unique idempotency key, two CHECK constraints, the partial outbox index, and the two
+least-privilege roles with their grants and `PUBLIC` revoked. One DDL authority, hand-edited where
+Prisma cannot express the constraint, and the worker emits no DDL.
+
+**The gates, as they stand:**
+
+```text
+$ pnpm test:api     -> 24 passed (2 harness + 22 schema)   [exit=0]
+$ pnpm test:worker  -> 14 passed                          [exit=0]
+$ prisma migrate diff --from-config-datasource --to-schema --exit-code -> No difference detected [exit=0]
+```
+
+**What measurement changed on the way**, because the list is the honest record of the work: the ERD
+and the design's own canonical SQL disagreed about defaults (three columns, resolved in favour of the
+SQL); the design claimed Prisma cannot express an enum, and it can; `client_id` had no defined origin
+and its nullable half made the idempotency constraint enforce nothing; the RED suite admitted a wrong
+schema that passed every assertion; the canonical test commands did not run the suites they claimed
+to gate; the generated client went stale without a single test noticing; and this feature's own claim
+that O2 was satisfied was refuted by a verifier and then actually satisfied.
+
+**Residue:** none in this feature. Eighteen commits on `feat/wu2-data-model`, none pushed — delivery
+is the supervisor's decision, as always.
+
+**Next:** WU-3 (the shared TS↔Python dispatch contract). It is the first unit that will import the
+generated Prisma client, so any build that compiles the API must run `prisma generate` first — the
+Docker image does not do it yet because nothing needed it.
