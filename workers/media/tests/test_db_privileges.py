@@ -11,7 +11,6 @@ Scratch cleanup is a storage operation, never a database ``DELETE``, which is wh
 DELETE at all.
 
 **How the two directions are asserted, and why they differ.**
-
 *Positives* are read from the catalog with ``has_table_privilege``: that function is PostgreSQL's own
 answer to "does this role hold this privilege on this table", so asserting it is asserting the
 requirement rather than a proxy for it.
@@ -25,12 +24,18 @@ enforcement without requiring role credentials. Credentials are a deployment con
 be able to log in for the API and worker processes to connect), and they are asserted separately as
 ``rolcanlogin`` rather than by shipping passwords into a test.
 
+**Known residual, stated rather than implied.** Column-level grants live in ``pg_attribute.attacl``
+and are not swept here; the design's matrix is table-level, and ``has_table_privilege`` does return
+true for any-column privileges, so a column-level grant is only caught where it touches the two
+executed write paths. Table ownership is asserted separately, because an owner can ``ALTER``/``DROP``
+without any DDL grant, which would make the DDL denial meaningless.
+
 Expected RED: neither role exists yet, so ``has_table_privilege`` raises "role ... does not exist"
 and ``SET ROLE`` fails the same way. That is an absence failure, and the evidence log records it as
 such -- a suite that fails because *it* is malformed would prove nothing.
 
-Names come from ``design.md`` §3 and ``.env.example``, not from invention: ``DATABASE_URL_TEST``
-points at the dedicated ``mediaforge_test`` database.
+Names come from ``design.md`` §3, not from invention: ``DATABASE_URL_TEST`` points at the dedicated
+``mediaforge_test`` database.
 """
 
 import os
@@ -47,6 +52,19 @@ API_ROLE = "mediaforge_api"
 WORKER_ROLE = "mediaforge_worker"
 
 TABLES = ["jobs", "job_inputs", "attempts", "submissions", "artifacts", "outbox"]
+
+# Every table privilege PostgreSQL has. The matrix sweeps all seven in both directions: an earlier
+# version swept only SELECT/INSERT/UPDATE/DELETE, so `GRANT TRUNCATE ON any_table TO either_role`
+# passed the whole suite while contradicting its own "every other combination must be absent" claim.
+ALL_TABLE_PRIVILEGES = (
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+)
 
 # design.md §3, verbatim as a matrix: {table: (privileges granted, privileges withheld)}.
 API_GRANTED = {
@@ -143,12 +161,40 @@ async def test_the_privilege_matrix_is_exactly_as_designed(role: str, granted: d
     connection = await owner_connection()
     try:
         for table in TABLES:
-            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+            for privilege in ALL_TABLE_PRIVILEGES:
                 expected = privilege in granted.get(table, set())
                 actual = await holds(connection, role, table, privilege)
                 assert actual is expected, (
                     f"{role} on {table}: {privilege} is {actual}, design says {expected}"
                 )
+    finally:
+        await connection.close()
+
+
+@pytest.mark.asyncio
+async def test_no_runtime_role_owns_a_table() -> None:
+    """``design.md`` §3: migrations run under the owner role. Ownership is asserted separately from
+grants because an owner can ``ALTER`` or ``DROP`` a table **without holding any DDL grant**, which
+would make the DDL denial in this suite meaningless while every other assertion stayed green."""
+    connection = await owner_connection()
+    try:
+        rows = await connection.fetch(
+            """
+            SELECT c.relname AS table, pg_get_userbyid(c.relowner) AS owner
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname = ANY($1::text[])
+            """,
+            TABLES,
+        )
+
+        # Non-vacuous: every table must be present before its owner can be judged.
+        assert sorted(row["table"] for row in rows) == sorted(TABLES)
+
+        owned_by_runtime = [
+            row["table"] for row in rows if row["owner"] in (API_ROLE, WORKER_ROLE)
+        ]
+        assert owned_by_runtime == [], f"runtime roles own tables: {owned_by_runtime}"
     finally:
         await connection.close()
 

@@ -123,6 +123,69 @@ pnpm --filter api --fail-if-no-match exec prisma migrate diff \
 The last command must report **no drift**. Both suites green. `--fail-if-no-match` is required, not
 decorative (defect D1).
 
+**Planned hand-edits to the generated migration.** Prisma cannot express these, so they are appended
+to the generated SQL so that one file stays the single DDL authority (`design.md` §5). The enum is
+**not** in this list: Prisma expresses it natively (`CREATE TYPE`), contrary to §5's wording.
+
+```sql
+-- 1. CHECK constraints -------------------------------------------------------
+ALTER TABLE "job_inputs" ADD CONSTRAINT "job_inputs_ordinal_positive" CHECK ("ordinal" >= 1);
+ALTER TABLE "attempts" ADD CONSTRAINT "attempts_attempt_no_positive" CHECK ("attempt_no" >= 1);
+ALTER TABLE "attempts" ADD CONSTRAINT "attempts_error_class_allowed"
+  CHECK ("error_class" IS NULL OR "error_class" IN ('retryable', 'non_retryable'));
+
+-- 2. The partial index the relay poll needs ----------------------------------
+CREATE INDEX "outbox_unpublished_idx" ON "outbox" ("published_at") WHERE "published_at" IS NULL;
+
+-- 3. Least-privilege roles (design.md §3) ------------------------------------
+-- LOGIN without a password: credentials are a deployment concern and are set out-of-band, so no
+-- password is committed in a migration. The privilege suite exercises these roles through SET ROLE
+-- and asserts `rolcanlogin` separately. The DO blocks make the migration re-appliable to a second
+-- database in the same cluster, where the roles already exist.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mediaforge_api') THEN
+    CREATE ROLE "mediaforge_api" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mediaforge_worker') THEN
+    CREATE ROLE "mediaforge_worker" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
+  END IF;
+END
+$$;
+
+-- The roles must be able to reach the database and the schema before table grants mean anything.
+-- The database name differs between dev and test, so it is read from the current connection.
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO "mediaforge_api", "mediaforge_worker"',
+                 current_database());
+END
+$$;
+GRANT USAGE ON SCHEMA "public" TO "mediaforge_api", "mediaforge_worker";
+
+-- PUBLIC holds nothing (design.md §3).
+REVOKE ALL ON ALL TABLES IN SCHEMA "public" FROM PUBLIC;
+REVOKE ALL ON SCHEMA "public" FROM PUBLIC;
+
+-- api: SELECT/INSERT/UPDATE on its four tables, SELECT on attempts and artifacts. No DDL, no DELETE.
+GRANT SELECT, INSERT, UPDATE ON "jobs", "job_inputs", "submissions", "outbox" TO "mediaforge_api";
+GRANT SELECT ON "attempts", "artifacts" TO "mediaforge_api";
+
+-- worker: SELECT on jobs/job_inputs/submissions, full control of attempts, INSERT on artifacts,
+-- UPDATE on jobs. No outbox access, and no DELETE for either role: scratch cleanup is a storage
+-- operation, never a database DELETE.
+GRANT SELECT ON "jobs", "job_inputs", "submissions" TO "mediaforge_worker";
+GRANT SELECT, INSERT, UPDATE ON "attempts" TO "mediaforge_worker";
+GRANT INSERT ON "artifacts" TO "mediaforge_worker";
+GRANT UPDATE ON "jobs" TO "mediaforge_worker";
+```
+
+**A version trap worth recording.** `npx prisma` (which the schema linter reaches for) resolves the
+`latest` dist-tag, and at the time of writing `latest` is **`8.0.0-rc.15`** — a release candidate. The
+last stable is **`7.10.0`** (`dist-tag: prev`), and that is what this project pins, for the same reason
+`pyproject.toml` pins Python to `3.11.x` exactly: an unpinned toolchain silently stops matching the
+thing being designed.
+
 ### 1.4 — O2: the harness database assertions move to the Prisma client · owner: AI
 
 The supervisor's observation O2, accepted 2026-09-16 and **binding on this unit**: when WU-2 lands,
@@ -247,6 +310,73 @@ which is precisely why silencing it would have been the wrong call. It was remov
 `set_config('role', $1, false)` is the same operation with the role as a bound parameter, and the
 `as_role` context manager takes no SQL at all, so the denial statements are literals at their call
 sites. Result: `Python clean`.
+
+### 1.2 — independent verification, and what it changed (2026-09-17)
+
+Verdict: a genuine RED (absence failures only, independently re-run), the design's privilege matrix
+matched **cell by cell in both directions**, and the vacuous-pass fix was confirmed as the correct
+assertion level — the verifier agreed that asserting "PUBLIC holds nothing" is the property that
+matters and that rejecting a NULL `relacl` would be testing a side effect instead.
+
+**Refuted, and fixed in this work unit:**
+
+- **The matrix swept four privileges, not all of them.** `GRANT TRUNCATE ON any_table TO either_role`
+  passed all eleven tests, contradicting the docstring's own claim that "every other combination must
+  be absent". The sweep now covers all seven table privileges PostgreSQL has.
+- **§3 requires migrations to run under the owner role, and nothing asserted it.** An owner can
+  `ALTER` or `DROP` a table **without holding any DDL grant**, so the DDL denial could have been
+  meaningless while every other assertion stayed green. A new test asserts no runtime role owns a
+  table, non-vacuously: it asserts the six tables exist before judging their owner.
+- **The header credited `.env.example`** for the variable names. That file does not exist — the
+  supervisor dropped it on 2026-09-16 — so the provenance is `design.md` §3, and the comment now says
+  only that.
+
+**Not measurable, recorded instead of assumed:** whether `set_config('role', $1, false)` enforces the
+same membership check as `SET ROLE` (constructing a non-membership denial requires creating roles,
+outside the verifier's authorized surface; PostgreSQL documents both as the same setting, and the
+observed missing-role failure is an absence error either way); and whether `REVOKE ALL FROM PUBLIC`
+can leave a zero-privilege `aclitem` behind (the assertion's direction is sound either way).
+
+**Residual, stated rather than implied:** column-level grants live in `pg_attribute.attacl` and are
+not swept. The design's matrix is table-level, and `has_table_privilege` does return true for
+any-column privileges, so a column-level grant is caught only where it touches the two executed write
+paths. That is now written in the suite's header instead of being left for a reader to discover.
+
+### 1.1 — independent verification, and what it changed (2026-09-17)
+
+The RDD gate for this work unit ran an independent verifier against `schema.spec.ts`. Verdict: the
+suite is a **genuine RED** — 11 of 11, every failure confirmed as absence-of-schema, re-run
+independently — and it is **not a complete gate**. Two items lead, because they are defects rather
+than opinions:
+
+1. **A false-RED waiting in GREEN.** `uniqueColumnSets` reads `pg_constraint` (`contype IN ('u','p')`).
+   Prisma emits `CREATE UNIQUE INDEX` for `@unique` and `@@unique`, and a unique index creates **no**
+   `pg_constraint` row. On a *correct* generated schema the four unique assertions would fail. The
+   suite has to read uniqueness as **enforcement** (unique indexes, partial ones excluded), not as
+   constraint rows — and the alternative, hand-editing the migration to convert uniques into
+   constraints, would be contorting the schema to please a test.
+2. **A false statement in this file's own header, inherited from the design.** The header claims
+   Prisma cannot express the `state` enum. It can: Prisma has native enum blocks and generates
+   `CREATE TYPE`. `design.md` §5 says the same thing and WU-2's `2.3` repeats it. Only the three CHECK
+   constraints and the partial index are genuinely inexpressible. `design.md` is this feature's
+   read-only source and is **not** edited here; the finding is recorded instead.
+
+**The finding that decided the response.** The verifier constructed a single wrong schema that passes
+**all eleven** assertions: a scrambled enum declaration order, `CHECK (error_class = 'non_retryable')`
+(which satisfies all three substring regexes, including `/retryable/` matching *inside* that literal),
+`submissions` without `creator_token_hash`, `artifacts.id` nullable and with no primary key,
+`outbox.payload` as `text`, an unrelated partial index on `created_at`, and `jobs.artifact_id`
+pointing at `submissions`. A gate that admits that schema is not a gate, so the suite is strengthened
+**before** GREEN: a suite measured against nothing produces green evidence about nothing.
+
+The strengthening list, all from that review: read uniqueness from unique indexes; assert the
+declared enum order as well as the label set; anchor the `uuidv7()` default regex instead of matching
+a substring; require the partial index's **leading column** and not only its predicate; compare the
+`error_class` label set exactly instead of matching substrings; assert the six expected foreign keys
+**and** their targets instead of only "every existing FK is indexed"; assert nullability in both
+directions for every column the ERD marks nullable; assert a primary key on every table; assert full
+column sets for `job_inputs`, `submissions`, `artifacts` and `outbox`, which had none; and widen the
+type assertions to the `int`, `uuid`, `jsonb` and remaining `timestamptz` columns.
 
 ## Out of scope
 
