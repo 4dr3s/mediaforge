@@ -208,6 +208,46 @@ plumbing is not evidence about the thing being measured.
 manifest (checked directly), so the finding does not reproduce and nothing was changed to silence
 it — the same disposition as findings F4/F5 in `repo-hygiene.md`.
 
+### 1.2 — RED: the least-privilege suite (2026-09-17)
+
+```text
+$ uv run --project workers/media pytest workers/media/tests/test_db_privileges.py -q
+
+E   asyncpg.exceptions.InvalidParameterValueError: role "mediaforge_api" does not exist
+=========================== short test summary info ===========================
+FAILED ...::test_both_runtime_roles_exist_without_superuser_power
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_api-granted0]
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_worker-granted1]
+FAILED ...::test_worker_cannot_reach_the_outbox
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_api]
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_worker]
+FAILED ...::test_neither_role_can_delete[mediaforge_api]
+FAILED ...::test_neither_role_can_delete[mediaforge_worker]
+FAILED ...::test_public_holds_nothing_on_the_tables
+FAILED ...::test_worker_can_actually_claim_an_attempt_and_fence_a_job
+FAILED ...::test_api_can_actually_write_its_create_transaction
+11 failed in 0.99s
+[exit=1]
+```
+
+The failure reason is absence (`role "mediaforge_api" does not exist`), not a malformed file.
+
+**The first run passed one test, and that pass was vacuous.** Before the fix, the run was
+`10 failed, 1 passed`, and the pass was `test_public_holds_nothing_on_the_tables`: with no tables in
+`pg_class`, the ACL query returns nothing, and an empty result satisfies "no privilege leaked". Green
+for a reason unrelated to what is asserted. Fixed by asserting `to_regclass(table) IS NOT NULL`
+before each ACL check, which is also what makes the test meaningful in GREEN. Second run: 11 failed,
+0 passed. This is the same family as defect D1 and the broken CR scan — a check that cannot fail
+the way it claims to.
+
+**A linter finding fixed structurally, not silenced.** The first version of this file built SQL by
+interpolation (`SET ROLE "{role}"`) and passed the statement into a helper as a string; pi-lens
+flagged it as an injection sink. The role names are module constants, so it was not exploitable —
+which is precisely why silencing it would have been the wrong call. It was removed instead:
+`set_config('role', $1, false)` is the same operation with the role as a bound parameter, and the
+`as_role` context manager takes no SQL at all, so the denial statements are literals at their call
+sites. Result: `Python clean`.
+
 ## Out of scope
 
 - WU-3 onward: the TS↔Python contract, the queue, the worker runtime, the state machine, storage.
