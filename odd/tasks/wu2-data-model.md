@@ -724,6 +724,25 @@ producing, that a match is not a finding until you read what it matched.
 build that compiles the API must run `prisma generate` first. The Docker image does not do it yet
 because nothing imports the client — that changes with the first unit that does.
 
+**Independent verification of the amended artifacts (2026-09-17).** The RDD gate for this work unit ran
+an adversarial verifier against the amended design and the live database. Verdict: **no refuted
+claim.** All six tables, all 48 domain columns with their types and nullability, the three enum types
+in declared order, six primary keys, four uniques (including `submissions.idempotency_key` being global
+rather than paired), six foreign keys, the two CHECKs, the partial index and the least-privilege grants
+match the catalog in both directions; each of the nine query-path rows names an index that exists with
+the claimed shape; and §5's migration path, its single applied record and the no-drift result were
+re-run rather than taken on faith.
+
+Two things it corrected, both fixed: the §3 amendment said `event_type` had been `text` plus a CHECK
+when it never had one, and the §5 amendment called the two CHECKs and the partial index "the only
+hand-edits left" while the same migration also carries the roles and grants.
+
+One claim it could not re-measure, and said so instead of accepting it: the spec note's historical
+statement that two submissions with the same key and a NULL client were both accepted. That column no
+longer exists, so the measurement is not repeatable on the current schema — but the verifier found the
+pre-fix shape in git (`3b35895`: a nullable `client_id` and a unique index on the pair) and confirmed
+the NULL-distinct reasoning. The honest state of that claim is **corroborated, not re-measured**.
+
 ## Out of scope
 
 - WU-3 onward: the TS↔Python contract, the queue, the worker runtime, the state machine, storage.

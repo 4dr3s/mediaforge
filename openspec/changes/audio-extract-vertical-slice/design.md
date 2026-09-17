@@ -137,9 +137,10 @@ serves.
 
 > **Amended 2026-09-17 (WU-2), after the model was built.** The schema now exists at
 > `apps/api/prisma/schema.prisma`, and building it surfaced three corrections the supervisor
-> approved: `attempts.error_class` and `outbox.event_type` became enum **types** rather than `text`
-> plus a CHECK — the same kind of closed domain `jobs.state` already used an enum for, and Prisma
-> *does* express enums, so §5's wording to the contrary is corrected there — and
+> approved: `attempts.error_class` and `outbox.event_type` became enum **types** instead of `text`
+> (`error_class` also carried a CHECK, which is now gone; `event_type` was plain text) — the same kind
+> of closed domain `jobs.state` already used an enum for, and Prisma *does* express enums, so §5's
+> wording to the contrary is corrected there — and
 > `submissions.client_id` was **removed** in favour of one globally unique `idempotency_key`. The
 > last one fixed a measured defect rather than a preference: `client_id` had no defined origin
 > anywhere, and because it was nullable, `unique (client_id, idempotency_key)` deduplicated nothing —
@@ -349,8 +350,11 @@ authority, and the worker never edits it.
 > building the model measured it: Prisma generates `CREATE TYPE` for an enum, and it did so for
 > `JobState`, `FailureClass` and `OutboxEventType`. `error_class` therefore became an enum type and
 > its CHECK is gone — which also removed a real hazard, because a CHECK can be written in a way that
-> forbids NULL on a column the ERD declares nullable, and a type cannot. The two surviving CHECKs and
-> the partial index are the only hand-edits left.
+> forbids NULL on a column the ERD declares nullable, and a type cannot. The two surviving CHECKs, the
+> partial index and the roles/grants are the hand-edits that remain. (Worth stating precisely, because
+> an independent verifier caught the first draft of this note claiming the two CHECKs and the index
+> were "the only" hand-edits: they are not — the migration also carries the least-privilege roles and
+> their grants, as §3 requires.)
 
 **Prisma is the chosen ORM and the single migration owner** — that is a recorded design
 decision, not a scaffolding artifact. Its **instantiation is a scaffolding step**: this

@@ -754,6 +754,27 @@ leés contra qué matcheó.
 cualquier build que compile la API tiene que correr `prisma generate` primero. La imagen de Docker
 todavía no lo hace porque nada importa el cliente — eso cambia con la primera unidad que lo haga.
 
+**Verificación independiente de los artefactos enmendados (2026-09-17).** El gate de RDD de esta unidad
+de trabajo corrió un verificador adversarial contra el design enmendado y la base viva. Veredicto:
+**ninguna afirmación refutada.** Las seis tablas, las 48 columnas de dominio con sus tipos y
+nulabilidad, los tres tipos enum en orden declarado, las seis claves primarias, los cuatro uniques
+(incluido `submissions.idempotency_key` siendo **global** en vez de un par), las seis claves foráneas,
+los dos CHECK, el índice parcial y los grants de privilegio mínimo coinciden con el catálogo en las dos
+direcciones; cada una de las nueve filas del trazado de índices nombra un índice que existe con la
+forma declarada; y la ruta de migración del §5, su único registro aplicado y el resultado sin drift se
+re-corrieron en vez de aceptarse por fe.
+
+Dos cosas que corrigió, las dos arregladas: la enmienda de §3 decía que `event_type` había sido `text`
+más un CHECK cuando nunca tuvo uno, y la de §5 llamaba a los dos CHECK y al índice parcial "los únicos
+hand-edits que quedan" mientras la misma migración también lleva los roles y los grants.
+
+Una afirmación que no pudo re-medir, y lo dijo en vez de aceptarla: el enunciado histórico de la nota
+de la spec, de que dos submissions con la misma key y cliente NULL se aceptaban las dos. Esa columna ya
+no existe, así que la medición no es repetible sobre el schema actual — pero el verificador encontró la
+forma previa al fix en git (`3b35895`: `client_id` nullable y un índice único sobre el par) y confirmó
+el razonamiento de los NULL distintos. El estado honesto de esa afirmación es **corroborada, no
+re-medida**.
+
 ## Fuera de alcance
 
 - De WU-3 en adelante: el contrato TS↔Python, la queue, el runtime del worker, la state machine,
