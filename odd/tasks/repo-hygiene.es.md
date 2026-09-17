@@ -256,6 +256,16 @@ S1:
 awk '/^```/{f=!f;next} f' <file> | md5sum
 ```
 
+### 1.8 — Registro de conformidad RDD · owner: IA
+
+El contrato RDD exige una evaluación después de cada commit de work-unit y un registro por tarea del
+tier y el outcome evaluados. El slice se evaluó una sola vez, al cierre, lo que fue una desviación,
+y el registro corregido resultó imposible de producir tal como estaba escrito. Tanto el barrido como
+las razones están en el log de evidencia, bajo *1.8 — Registro de conformidad RDD*.
+
+**Aceptación:** cada work unit lleva un outcome explícito, y la razón por la que no puede llevar un
+tier está medida, no asumida.
+
 ## Log de evidencia
 
 Salida cruda, agregada a medida que cierra cada tarea. Verbatim, sin parafrasear.
@@ -351,6 +361,74 @@ dos copias `.es.md` se regeneraron y se verificaron byte-idénticas en sus bloqu
 reconciliation · `758df00` Makefile entrypoints · `b8f1c7d` pnpm build scripts · `42a189b` lint
 re-measurement and D1 control · `23585e5` LF line endings. Los cinco commits que precedieron a
 esta feature son `b05afcd`, `892f706`, `9d05ebd`, `ab47532`, `9eb288b`.
+
+### 1.8 — Registro de conformidad RDD (2026-09-17)
+
+El contrato RDD exige una evaluación después de cada commit de work-unit y un registro por tarea del
+tier y el outcome evaluados (`granted | declined | passive | deferred to slice | unavailable`).
+Medido después de que el slice se pusheara, ese registro no puede producirse tal como está escrito,
+por dos razones independientes — una de ellas mía.
+
+**Razón una (mía): el paso no se dio cuando era expresable.** Corrí una sola evaluación al cierre
+del slice en vez de una por commit. El camino pasivo del contrato es lo que avanza el boundary
+revisado; sin evaluación por commit, el boundary nunca se movió del punto de ramificación, así que
+el candidato se acumuló hasta 8 archivos y 943 líneas. La acumulación fue estructural, no
+incidental.
+
+**Razón dos (de la herramienta): el camino pasivo es inalcanzable, así que el avance del boundary
+nunca fue posible de todos modos.** `assess` resuelve el candidato como `<baseRef>..HEAD`. HEAD
+ahora está fijo, así que los tiers retroactivos por commit no son expresables: cada base produce el
+rango acumulado en vez del commit. Y todo rango que no lleva señal de riesgo vuelve como
+`unassessable`:
+
+| baseRef | `Makefile` dentro del rango | resultado |
+| --- | --- | --- |
+| `9eb288b` (padre del slice) | sí | `high` · `process_boundary` · 8 archivos, 943 líneas |
+| `914b65d` | sí | `high` · `process_boundary` · 7 archivos, 786 líneas |
+| `758df00` | no | `unassessable` — `native response is schema incompatible` |
+| `42a189b` | no | `unassessable` — ídem |
+| `23585e5` | no | `unassessable` — ídem |
+| `6fe5314` | no | `unassessable` — ídem |
+
+La única señal de riesgo de este slice es el `Makefile`, porque el cambio toca un boundary de
+proceso shell. Los rangos que lo contienen evalúan bien; los que no lo tienen fallan la validación
+de schema del lado de Pi. El caso limpio — el que el contrato mapea a *"passive/low: no reviewer or
+consent ceremony, and the boundary advances"* — es precisamente el caso que no puede producir un
+veredicto, y el contrato entonces instruye tratar una evaluación fallida como `high`. El mecanismo
+está **inferido de cuatro casos refutados y dos confirmados, no leído del schema**: apoyo fuerte
+para una hipótesis, no un diagnóstico.
+
+Dos sondas anteriores devolvieron `native command returned empty output` en su lugar. Esa cadena
+significa que el argumento base-ref no se resolvió a un commit (estaba mal escrito), y se distingue
+de la incompatibilidad de schema de arriba — útil al reproducir, porque las dos fallas se parecen y
+no son lo mismo.
+
+**Outcome registrado, por work unit: `unavailable`** — las ocho, para la review nativa; y
+`unassessable` tratado como `high` dondequiera que se probó una base ref. No se inventó nada para
+llenar el campo.
+
+**Consecuencia, dicha sin vueltas.** Este slice recibió el camino gateado por riesgo:
+auto-verificación del escritor más un verificador independiente obligatorio. Habría recibido
+exactamente eso con RDD apagado. El camino más liviano del contrato nunca estuvo disponible para él,
+y ningún cambio de secuenciación lo habría hecho disponible.
+
+**Work unit siguiente (el espejo en español), evaluado el 2026-09-17.** Este **sí** se evaluó en la
+proyección workspace, como pide el contrato, y falla igual:
+
+```text
+$ gentle_review {"operation":"assess"}    # ambient working tree, two .md files
+risk: unassessable
+reasons: [{"code":"native-assess-unavailable",
+           "detail":"native review assess failed: native response is schema incompatible"}]
+nativeReviewOutcome: unknown · outcome_source: unknown
+```
+
+Así que el defecto no se trata de rangos commiteados: se trata de que el candidato **no lleve
+señal de riesgo**. Siete puntos de datos ahora, todos consistentes — seis base refs más este
+candidato del workspace. Outcome registrado: `unassessable` tratado como `high`. La review nativa
+se salteó para este candidato según los propios términos de la regla de entrada (*"a trivial passive
+documentation-only edit"*), y el camino gateado por riesgo se satisfizo con el chequeo de hashes del
+par, re-corrido de forma independiente por el padre después de que el worker lo reportara.
 
 ## Fuera de alcance
 
