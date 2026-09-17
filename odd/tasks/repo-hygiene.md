@@ -186,6 +186,19 @@ pnpm --filter api --fail-if-no-match exec vitest run test/harness.spec.ts       
 The flag is what makes the gate capable of failing. This is D1's own lesson repeating one level
 up: the first control was a guess that read as evidence, and only the A/B disproved it.
 
+**The observation that killed the first control, stated as its own measurement** (writer run,
+2026-09-17 — an independent verifier pointed out that the paragraph above asserted this without a
+reproducible command in the document, which is exactly the kind of claim this feature exists to
+stop):
+
+```bash
+pnpm --filter api exec vitest run no/such/spec.ts                 # exit 1, without the flag
+pnpm --filter api --fail-if-no-match exec vitest run no/such/spec.ts  # exit 1, with the flag
+```
+
+Both red, so that control cannot tell the fix apart from vitest failing on its own. It measures
+vitest, not the gate.
+
 ### 1.4 — Pin the allowed build scripts · owner: AI
 
 `pnpm install` reports two ignored build scripts (`@nestjs/core`, `esbuild`). Harmless while a human
@@ -282,12 +295,22 @@ package.json: text: auto
 package.json: eol: lf
 ```
 
+Two notes on re-running this. The census reads **54** because that is the count at the moment of the
+scan, before `.gitattributes` itself was tracked; at `HEAD` the same commands report **55**, and
+both numbers are the whole tracked set (`54 of 54`, `55 of 55`). And the scanned set is what counts,
+not the number.
+
 ### 1.3 — the runner gate
 
 The A/B block is already in the task body above; measured 2026-09-17, so nothing new to record
 here.
 
 ### 1.4 — the pnpm pin (2026-09-17)
+
+The durations quoted below (`581ms`, `0.23s`) are single samples, as raw output always is: the
+independent verification re-ran the same commands and got `585ms` and `0.20s` with identical pass
+counts, exit codes and pnpm version. Pass counts and exit codes are the evidence; timings are
+whatever the machine did that second.
 
 ```text
 $ pnpm install

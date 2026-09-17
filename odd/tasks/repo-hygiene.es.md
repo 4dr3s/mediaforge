@@ -193,6 +193,19 @@ pnpm --filter api --fail-if-no-match exec vitest run test/harness.spec.ts       
 El flag es lo que vuelve al gate capaz de fallar. Es la lección de D1 repitiéndose un nivel más
 arriba: el primer control fue una conjetura que se leía como evidencia, y solo el A/B la desmintió.
 
+**La observación que mató al primer control, como medición propia** (corrida del escritor,
+2026-09-17 — un verificador independiente marcó que el párrafo de arriba la afirmaba sin un
+comando reproducible en el documento, que es exactamente la clase de afirmación que esta feature
+existe para frenar):
+
+```bash
+pnpm --filter api exec vitest run no/such/spec.ts                 # exit 1, without the flag
+pnpm --filter api --fail-if-no-match exec vitest run no/such/spec.ts  # exit 1, with the flag
+```
+
+Los dos en rojo, así que ese control no puede distinguir el fix de que vitest falle solo. Mide a
+vitest, no al gate.
+
 ### 1.4 — Fijar los build scripts permitidos · owner: IA
 
 `pnpm install` reporta dos build scripts ignorados (`@nestjs/core`, `esbuild`). Inofensivo mientras
@@ -290,12 +303,22 @@ package.json: text: auto
 package.json: eol: lf
 ```
 
+Dos aclaraciones para quien lo re-corra. El censo dice **54** porque es el número al momento del
+scan, antes de que `.gitattributes` mismo estuviera trackeado; en `HEAD` los mismos comandos
+reportan **55**, y los dos números son el conjunto trackeado entero (`54 de 54`, `55 de 55`). Lo que
+cuenta es que el conjunto escaneado esté completo, no el número.
+
 ### 1.3 — el gate del runner
 
 El bloque A/B ya está en el cuerpo de la tarea de más arriba; medido el 2026-09-17, así que no hay
 nada nuevo que registrar acá.
 
 ### 1.4 — el pin de pnpm (2026-09-17)
+
+Las duraciones citadas abajo (`581ms`, `0.23s`) son de una sola muestra, como lo es toda salida
+cruda: la verificación independiente re-corrió los mismos comandos y obtuvo `585ms` y `0.20s`, con
+idénticos conteos de tests, exit codes y versión de pnpm. La evidencia son los conteos y los exit
+codes; los tiempos son lo que la máquina hizo ese segundo.
 
 ```text
 $ pnpm install
