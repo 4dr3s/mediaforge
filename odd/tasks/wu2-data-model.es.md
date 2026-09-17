@@ -76,6 +76,12 @@ cosa, y el repositorio gana. El ERD de §3 es la entrada.
    `lineageId` que su propio paso de collect nunca emite. `assess` falla la validación de schema con
    cualquier candidato que no tenga señal de riesgo. Los work-unit commits siguen, porque son los
    puntos de recuperación y las unidades revisables.
+4. **Correcciones al modelo de datos, de la revisión del supervisor (2026-09-17).** Tres cambios,
+   cada uno con su motivo: `attempts.error_class` y `outbox.event_type` pasan a ser **tipos enum**
+   (dominios cerrados que el diseño fija), y `submissions` pierde `client_id` mientras
+   `idempotency_key` pasa a NOT NULL y único global. El tercero arregla un **defecto medido**, no una
+   preferencia de estilo — ver la tarea 1.7 y el registro de evidencia. El criterio enum-versus-texto
+   queda escrito en el header del schema, para que la próxima columna no se decida por accidente.
 
 ## Tareas
 
@@ -231,9 +237,208 @@ información nueva y va al log, no a un hábito.
 **Aceptación:** cada unidad de trabajo tiene una línea explícita de tier-o-resultado, y los hallazgos
 del verificador independiente quedan registrados con lo que se hizo con cada uno.
 
+### 1.7 — Correcciones al modelo de datos, de la revisión del supervisor · owner: IA
+
+Levantadas por el supervisor después de leer el documento de la feature y los artefactos creados.
+Cuatro ítems: tres cambios al modelo y un arreglo de documentación.
+
+1. **`attempts.error_class` pasa al tipo enum `FailureClass`** (`retryable`, `non_retryable`). La
+   columna era `text` más un CHECK, mientras que `jobs.state` — el mismo tipo de dominio cerrado — ya
+   era enum. El diseño no daba criterio para la diferencia, y la razón que daba en §5 ("constraints que
+   Prisma no puede expresar") es falsa: Prisma genera `CREATE TYPE` para un enum. Convertirla además
+   elimina el CHECK, y con él el hueco que un verificador independiente había construido — un tipo no
+   se puede escribir de forma que prohíba NULL en una columna que el diseño declara nullable.
+2. **`outbox.event_type` pasa al tipo enum `OutboxEventType`** (`job.queued`). El diseño fija el
+   conjunto; un tipo lo documenta y es la forma en que se agrega un segundo evento.
+3. **`submissions` pierde `client_id`; `idempotency_key` pasa a NOT NULL y único global.** Es un
+   arreglo de defecto, medido, no una preferencia: ver el registro de evidencia.
+4. **El criterio queda escrito.** `job_type` sigue siendo text (clave de un registry, abierta por
+   diseño) y las dos columnas `error_code` siguen siendo text (taxonomía abierta que el diseño espera
+   que crezca). El header del schema ahora dice cuándo aplica cada uno.
+
+**Aceptación:** los tres enums existen en la base viva con las etiquetas declaradas; `submissions` no
+tiene `client_id` y rechaza una `idempotency_key` repetida; las dos suites verdes; `migrate diff` sin
+drift. Como la migración **nunca salió de esta máquina** (la rama es local y `mediaforge_test` es su
+único destino), el cambio se pliega en la migración inicial en vez de agregar una segunda — si se
+hubiera compartido, una migración de fixup habría sido la única opción honesta.
+
+**Divergencia conocida, registrada y no escondida:** `design.md` §3 todavía muestra `client_id`,
+`error_class` como `text` y `event_type` como `text`, y la spec de C1 todavía describe el par
+`(client_id, key)`. El design y las specs son artefactos aprobados y esta feature los trata como
+solo-lectura, así que el schema ahora **diverge de ellos a propósito**. Actualizar esos dos artefactos
+es decisión del supervisor y queda listado en *Fuera de alcance* hasta que pase.
+
 ## Registro de evidencia
 
 Salida cruda, agregada a medida que cierra cada tarea. Verbatim, sin parafrasear.
+
+### 1.1 — RED: la suite del contrato de schema (2026-09-17)
+
+```text
+$ pnpm --filter api --fail-if-no-match exec vitest run test/schema.spec.ts
+
+ test/schema.spec.ts (11 tests | 11 failed) 262ms
+   × schema :: tables exist > creates exactly the six tables of the ERD
+     → expected [] to deeply equal [ 'artifacts', 'attempts', …(4) ]
+   × schema :: the six states, and no seventh > types jobs.state as an enum whose labels are exactly the six canonical states
+     → jobs.state is missing: expected undefined to be defined
+   × schema :: uniqueness is enforced, and by the engine > declares the four unique column sets the ERD requires
+     → expected [] to deeply equally contain [ 'job_id', 'ordinal' ]
+   × schema :: uniqueness is enforced, and by the engine > rejects a duplicate (job_id, ordinal) with a real unique violation
+     → relation "jobs" does not exist
+   × schema :: no counter column on jobs > has exactly the ERD columns, and none of them is a counter
+     → expected [] to deeply equal [ 'id', 'job_type', 'params', …(6) ]
+   × schema :: no counter column on jobs > keeps attempts as rows: the table exists and is keyed per attempt
+     → expected [] to deeply equal [ 'id', 'job_id', 'attempt_no', …(7) ]
+   × schema :: ids are database-minted > defaults every primary key to uuidv7() except artifacts.id
+     → .toMatch() expects to receive a string, but got undefined
+   × schema :: the partial index the relay poll needs > indexes outbox (published_at) WHERE published_at IS NULL
+     → no partial outbox index; found:
+   × schema :: CHECK constraints Prisma cannot express > constrains ordinal, attempt_no and error_class
+     → expected '' to match /ordinal\s*>=\s*1/
+   × schema :: types are the ones the model declares > uses timestamptz, bigint and jsonb where the ERD says so
+     → expected undefined to be 'jsonb'
+   × schema :: every foreign key is indexed > has an index whose leading column is each foreign-key column
+     → expected 0 to be greater than 0
+
+ Test Files  1 failed (1)
+      Tests  11 failed (11)
+[exit=1]
+```
+
+**Por qué este es el RED correcto.** Diez de las once fallan porque el catálogo está vacío, y la
+undécima porque el insert de comportamiento no encontró tabla (`relation "jobs" does not exist`).
+Ninguna falló por un error de sintaxis o de tipo dentro del archivo de test. Esa distinción es el
+sentido entero de registrar una corrida RED: un test mal formado también falla, y esa falla no
+probaría nada sobre el schema.
+
+**Un artefacto de plomería que vale la pena registrar.** Una segunda corrida pasada por `head -30`
+imprimió `exit=0`. Ese número venía del pipe truncado, no de una suite verde — el exit code
+autoritativo es el `1` de la primera corrida, tomado sin truncar. Es el defecto D1 en miniatura: un
+status producido por la plomería no es evidencia sobre la cosa que se está midiendo.
+
+**Advertencia del linter, no accionada.** pi-lens reportó un hallazgo de knip **viejo** para
+`apps/api/package.json`: `Unused devDependency @nestjs/schematics`. Ese paquete no está en el
+manifiesto (verificado directo), así que el hallazgo no se reproduce y no se cambió nada para
+silenciarlo — la misma disposición que los hallazgos F4/F5 de `repo-hygiene.md`.
+
+
+### 1.1 — verificación independiente, y qué cambió (2026-09-17)
+
+La gate RDD de esta unidad de trabajo corrió un verificador independiente contra `schema.spec.ts`.
+Veredicto: la suite es un **RED genuino** — 11 de 11, cada falla confirmada como ausencia de schema,
+re-corrida de forma independiente — y **no es una gate completa**. Dos ítems encabezan, porque son
+defectos más que opiniones:
+
+1. **Un falso RED esperando en GREEN.** `uniqueColumnSets` lee `pg_constraint` (`contype IN ('u','p')`).
+   Prisma emite `CREATE UNIQUE INDEX` para `@unique` y `@@unique`, y un índice único no crea **ninguna**
+   fila de `pg_constraint`. Sobre un schema generado *correcto*, las cuatro aserciones de uniqueness
+   fallarían. La suite tiene que leer la uniqueness como **enforcement** (índices únicos, excluyendo
+   los parciales), no como filas de constraint — y la alternativa, editar a mano la migración para
+   convertir los uniques en constraints, sería contorsionar el schema para complacer a un test.
+2. **Una afirmación falsa en el propio header de este archivo, heredada del diseño.** El header
+   afirma que Prisma no puede expresar el enum `state`. Puede: Prisma tiene bloques de enum nativos y
+   genera `CREATE TYPE`. `design.md` §5 dice lo mismo y el `2.3` de WU-2 lo repite. Solo las tres
+   restricciones CHECK y el índice parcial son genuinamente inexpresables. `design.md` es la fuente de
+   solo lectura de esta feature y **no se edita acá**; el hallazgo se registra en cambio.
+
+**El hallazgo que decidió la respuesta.** El verificador construyó un único schema incorrecto que pasa
+**las once** aserciones: un orden de declaración de enum mezclado, `CHECK (error_class =
+'non_retryable')` (que satisface los tres regex de substring, incluyendo a `/retryable/` matcheando
+*adentro* de ese literal), `submissions` sin `creator_token_hash`, `artifacts.id` nullable y sin
+primary key, `outbox.payload` como `text`, un índice parcial irrelevante sobre `created_at`, y
+`jobs.artifact_id` apuntando a `submissions`. Una gate que admite ese schema no es una gate, así que
+la suite se fortalece **antes** del GREEN: una suite medida contra nada produce evidencia verde sobre
+nada.
+
+La lista de refuerzos, toda de esa revisión: leer la uniqueness desde los índices únicos; afirmar el
+orden declarado del enum además del conjunto de labels; anclar el regex del default `uuidv7()` en vez
+de matchear un substring; exigir la **columna principal** del índice parcial y no solo su predicado;
+comparar el conjunto de labels de `error_class` de forma exacta en vez de matchear substrings; afirmar
+las seis foreign keys esperadas **y** sus targets en vez de solo "toda FK existente está indexada";
+afirmar la nulabilidad en las dos direcciones para cada columna que el ERD marca nullable; afirmar una
+primary key en cada tabla; afirmar los conjuntos completos de columnas de `job_inputs`, `submissions`,
+`artifacts` y `outbox`, que no tenían ninguno; y ampliar las aserciones de tipo a las columnas `int`,
+`uuid`, `jsonb` y las `timestamptz` restantes.
+
+
+### 1.2 — RED: la suite de privilegio mínimo (2026-09-17)
+
+```text
+$ uv run --project workers/media pytest workers/media/tests/test_db_privileges.py -q
+
+E   asyncpg.exceptions.InvalidParameterValueError: role "mediaforge_api" does not exist
+=========================== short test summary info ===========================
+FAILED ...::test_both_runtime_roles_exist_without_superuser_power
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_api-granted0]
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_worker-granted1]
+FAILED ...::test_worker_cannot_reach_the_outbox
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_api]
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_worker]
+FAILED ...::test_neither_role_can_delete[mediaforge_api]
+FAILED ...::test_neither_role_can_delete[mediaforge_worker]
+FAILED ...::test_public_holds_nothing_on_the_tables
+FAILED ...::test_worker_can_actually_claim_an_attempt_and_fence_a_job
+FAILED ...::test_api_can_actually_write_its_create_transaction
+11 failed in 0.99s
+[exit=1]
+```
+
+La razón de la falla es ausencia (`role "mediaforge_api" does not exist`), no un archivo mal formado.
+
+**La primera corrida pasó un test, y ese pase era vacuo.** Antes del fix, la corrida era
+`10 failed, 1 passed`, y el pase era `test_public_holds_nothing_on_the_tables`: sin tablas en
+`pg_class`, la query de ACL no devuelve nada, y un resultado vacío satisface "ningún privilegio
+filtrado". Verde por una razón ajena a lo que se afirma. Arreglado afirmando `to_regclass(table) IS
+NOT NULL` antes de cada check de ACL, que es también lo que hace al test significativo en GREEN.
+Segunda corrida: 11 failed, 0 passed. Es la misma familia que el defecto D1 y el CR scan roto — un
+check que no puede fallar de la manera que dice fallar.
+
+**Un hallazgo del linter corregido estructuralmente, no silenciado.** La primera versión de este
+archivo construía el SQL por interpolación (`SET ROLE "{role}"`) y le pasaba la sentencia a un helper
+como string; pi-lens lo marcó como un sink de inyección. Los nombres de rol son constantes de módulo,
+así que no era explotable — que es exactamente por qué silenciarlo habría sido la decisión
+equivocada. Se eliminó en cambio: `set_config('role', $1, false)` es la misma operación con el rol
+como parámetro enlazado, y el context manager `as_role` no recibe SQL en absoluto, así que las
+sentencias de denegación son literales en sus call sites. Resultado: `Python clean`.
+
+
+### 1.2 — verificación independiente, y qué cambió (2026-09-17)
+
+Veredicto: un RED genuino (solo fallas por ausencia, re-corrida de forma independiente), la matriz de
+privilegios del diseño coincidió **celda por celda en las dos direcciones**, y el fix del pase vacuo
+quedó confirmado como el nivel de aserción correcto — el verificador coincidió en que afirmar "PUBLIC
+no tiene nada" es la propiedad que importa y que rechazar un `relacl` NULL sería testear un efecto
+secundario.
+
+**Refutado, y arreglado en esta unidad de trabajo:**
+
+- **La matriz barrió cuatro privilegios, no todos.** `GRANT TRUNCATE ON any_table TO either_role`
+  pasaba los once tests, contradiciendo la afirmación del propio docstring de que "toda otra
+  combinación debe estar ausente". El barrido ahora cubre los siete privilegios de tabla que tiene
+  PostgreSQL.
+- **§3 exige que las migraciones corran bajo el rol owner, y nada lo afirmaba.** Un owner puede
+  `ALTER` o `DROP` una tabla **sin tener ningún grant de DDL**, así que la denegación de DDL podría
+  haber sido vacua mientras toda otra aserción seguía verde. Un test nuevo afirma que ningún rol de
+  runtime es dueño de una tabla, de forma no vacua: afirma que las seis tablas existen antes de juzgar
+  a su owner.
+- **El header le daba el crédito a `.env.example`** por los nombres de variable. Ese archivo no existe
+  — el supervisor lo dropeó el 2026-09-16 — así que la procedencia es `design.md` §3, y el comentario
+  ahora dice solo eso.
+
+**No medible, registrado en vez de asumido:** si `set_config('role', $1, false)` impone el mismo
+check de membresía que `SET ROLE` (construir una denegación de no-membresía requiere crear roles,
+fuera de la superficie autorizada del verificador; PostgreSQL documenta ambos como el mismo setting,
+y la falla por rol inexistente observada es un error de ausencia de cualquier manera); y si `REVOKE
+ALL FROM PUBLIC` puede dejar atrás un `aclitem` con cero privilegios (la dirección de la aserción es
+sólida de cualquier manera).
+
+**Residual, declarado en vez de implícito:** los grants a nivel columna viven en
+`pg_attribute.attacl` y no se barren. La matriz del diseño es a nivel tabla, y `has_table_privilege`
+sí devuelve true para privilegios de cualquier columna, así que un grant a nivel columna solo se
+atrapa donde toca los dos caminos de escritura ejecutados. Eso ahora está escrito en el header de la
+suite en vez de dejado para que un lector lo descubra.
+
 
 ### 1.3 — GREEN: schema, migración, roles (2026-09-17)
 
@@ -250,6 +455,12 @@ real en los supuestos del diseño, no un bump de dependencia.
 > de `pg`. O2 nunca la satisfizo esta unidad de trabajo — es la **tarea 1.4**, y sigue abierta. La
 > afirmación se escribió razonando sobre el adapter en vez de leer el manifiesto, que es exactamente
 > la falla que este proyecto no deja de encontrar en los documentos ajenos.
+>
+> **Cerrada más tarde el mismo día, en la tarea 1.4.** Las dos mitades ahora son verdaderas y están
+> medidas: ni `pg` ni `@types/pg` aparecen en ningún manifiesto de este repositorio, y ningún archivo
+> importa `from 'pg'` — las dos suites hablan con PostgreSQL por el cliente de Prisma.
+> `@prisma/adapter-pg` sigue trayendo `pg` **de forma transitiva**, que es lo esperado y es la forma
+> honesta de decirlo: la constraint es sobre el manifiesto.
 
 **Una trampa de versiones, medida.** `npm view prisma dist-tags` reporta `latest: 8.0.0-rc.15` — una
 release candidate bajo el tag `latest` — y `prev: 7.10.0`. `npx prisma` (al que llega el linter de
@@ -348,6 +559,7 @@ los paths asumían un layout plano. En un workspace de pnpm los binarios viven e
 `apps/api/node_modules`, y `dist` en `apps/api/dist`. La imagen estaba bien; el check no. Listado acá
 porque la corrección es el punto: `docker run` solo es evidencia si el path es el correcto.
 
+
 ### 1.3 — verificación independiente, y qué refutó (2026-09-17)
 
 Siete afirmaciones se sostuvieron: la base viva coincide con el ERD §3/§4 con **cero divergencia en
@@ -379,173 +591,97 @@ dieciocho aserciones y construyó bases incorrectas que las pasan todas:
    dropeara pasaría las dieciocho y después fallaría en runtime con los inserts canónicos del propio
    diseño.
 
-Las tres se cierran en el commit de seguimiento de la tarea 1.4. La lección es la misma que esta
-feature no deja de producir desde ángulos distintos: una aserción de catálogo prueba lo que lee, y
-nada más.
+**Dónde quedan esos tres — y una corrección.** El primero está cerrado **por construcción**: `error_class`
+es ahora un tipo enum y la suite afirma que la columna sigue nullable, así que un CHECK que prohíba NULL
+ya no existe para ser escrito. Los otros dos — el CHECK sobre-restringido de `ordinal` y los tres
+defaults de §6 — **no** estaban cerrados cuando este párrafo afirmó por primera vez que lo estaban;
+decir "cerrados en el follow-up" antes de que las aserciones existieran es la misma falla que esta
+feature viene encontrando, un nivel más arriba. Los tres están ahora cerrados, en el follow-up de 1.4
+que movió esta suite al cliente de Prisma: el CHECK sobre-restringido se caza **conductualmente** (una
+fila con `ordinal = 2` tiene que aceptarse) y los defaults se afirman leyendo `column_default` y
+exigiendo **exactamente** `attempts.created_at`, `outbox.created_at` y `outbox.attempts` — y ninguna
+otra columna. La lección se sostiene igual: una aserción de catálogo prueba lo que lee, y nada más.
 
-### 1.1 — RED: la suite del contrato de schema (2026-09-17)
 
-```text
-$ pnpm --filter api --fail-if-no-match exec vitest run test/schema.spec.ts
+### 1.4 — O2 cerrada, y los dos huecos que quedaban en las suites (2026-09-17)
 
- test/schema.spec.ts (11 tests | 11 failed) 262ms
-   × schema :: tables exist > creates exactly the six tables of the ERD
-     → expected [] to deeply equal [ 'artifacts', 'attempts', …(4) ]
-   × schema :: the six states, and no seventh > types jobs.state as an enum whose labels are exactly the six canonical states
-     → jobs.state is missing: expected undefined to be defined
-   × schema :: uniqueness is enforced, and by the engine > declares the four unique column sets the ERD requires
-     → expected [] to deeply equally contain [ 'job_id', 'ordinal' ]
-   × schema :: uniqueness is enforced, and by the engine > rejects a duplicate (job_id, ordinal) with a real unique violation
-     → relation "jobs" does not exist
-   × schema :: no counter column on jobs > has exactly the ERD columns, and none of them is a counter
-     → expected [] to deeply equal [ 'id', 'job_type', 'params', …(6) ]
-   × schema :: no counter column on jobs > keeps attempts as rows: the table exists and is keyed per attempt
-     → expected [] to deeply equal [ 'id', 'job_id', 'attempt_no', …(7) ]
-   × schema :: ids are database-minted > defaults every primary key to uuidv7() except artifacts.id
-     → .toMatch() expects to receive a string, but got undefined
-   × schema :: the partial index the relay poll needs > indexes outbox (published_at) WHERE published_at IS NULL
-     → no partial outbox index; found:
-   × schema :: CHECK constraints Prisma cannot express > constrains ordinal, attempt_no and error_class
-     → expected '' to match /ordinal\s*>=\s*1/
-   × schema :: types are the ones the model declares > uses timestamptz, bigint and jsonb where the ERD says so
-     → expected undefined to be 'jsonb'
-   × schema :: every foreign key is indexed > has an index whose leading column is each foreign-key column
-     → expected 0 to be greater than 0
-
- Test Files  1 failed (1)
-      Tests  11 failed (11)
-[exit=1]
-```
-
-**Por qué este es el RED correcto.** Diez de las once fallan porque el catálogo está vacío, y la
-undécima porque el insert de comportamiento no encontró tabla (`relation "jobs" does not exist`).
-Ninguna falló por un error de sintaxis o de tipo dentro del archivo de test. Esa distinción es el
-sentido entero de registrar una corrida RED: un test mal formado también falla, y esa falla no
-probaría nada sobre el schema.
-
-**Un artefacto de plomería que vale la pena registrar.** Una segunda corrida pasada por `head -30`
-imprimió `exit=0`. Ese número venía del pipe truncado, no de una suite verde — el exit code
-autoritativo es el `1` de la primera corrida, tomado sin truncar. Es el defecto D1 en miniatura: un
-status producido por la plomería no es evidencia sobre la cosa que se está midiendo.
-
-**Advertencia del linter, no accionada.** pi-lens reportó un hallazgo de knip **viejo** para
-`apps/api/package.json`: `Unused devDependency @nestjs/schematics`. Ese paquete no está en el
-manifiesto (verificado directo), así que el hallazgo no se reproduce y no se cambió nada para
-silenciarlo — la misma disposición que los hallazgos F4/F5 de `repo-hygiene.md`.
-
-### 1.2 — RED: la suite de privilegio mínimo (2026-09-17)
+Las dos mitades de O2, medidas y no afirmadas: ni `pg` ni `@types/pg` en ningún manifiesto de este
+repositorio, y ningún archivo que importe `from 'pg'` — las dos suites llegan a PostgreSQL por el
+cliente de Prisma que construye `test/prisma-client.ts`. El adapter sigue dependiendo de `pg` de forma
+transitiva; la constraint es sobre el manifiesto, y así se reporta.
 
 ```text
-$ uv run --project workers/media pytest workers/media/tests/test_db_privileges.py -q
-
-E   asyncpg.exceptions.InvalidParameterValueError: role "mediaforge_api" does not exist
-=========================== short test summary info ===========================
-FAILED ...::test_both_runtime_roles_exist_without_superuser_power
-FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_api-granted0]
-FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_worker-granted1]
-FAILED ...::test_worker_cannot_reach_the_outbox
-FAILED ...::test_neither_role_can_run_ddl[mediaforge_api]
-FAILED ...::test_neither_role_can_run_ddl[mediaforge_worker]
-FAILED ...::test_neither_role_can_delete[mediaforge_api]
-FAILED ...::test_neither_role_can_delete[mediaforge_worker]
-FAILED ...::test_public_holds_nothing_on_the_tables
-FAILED ...::test_worker_can_actually_claim_an_attempt_and_fence_a_job
-FAILED ...::test_api_can_actually_write_its_create_transaction
-11 failed in 0.99s
-[exit=1]
+$ grep -rn "from 'pg'" apps workers        -> NINGUNO
+$ grep -n '"pg"|@types/pg' apps/api/package.json -> NO esta en el manifiesto
+$ pnpm test:api     -> Test Files 2 passed (2) · Tests 24 passed (24)   [exit=0]
+$ pnpm test:worker  -> 14 passed in 0.76s                              [exit=0]
+$ prisma migrate diff --from-config-datasource --to-schema --exit-code -> No difference detected [exit=0]
 ```
 
-La razón de la falla es ausencia (`role "mediaforge_api" does not exist`), no un archivo mal formado.
+Los dos huecos que quedaban del verificador se cierran **conductualmente**, no apretando un regex:
 
-**La primera corrida pasó un test, y ese pase era vacuo.** Antes del fix, la corrida era
-`10 failed, 1 passed`, y el pase era `test_public_holds_nothing_on_the_tables`: sin tablas en
-`pg_class`, la query de ACL no devuelve nada, y un resultado vacío satisface "ningún privilegio
-filtrado". Verde por una razón ajena a lo que se afirma. Arreglado afirmando `to_regclass(table) IS
-NOT NULL` antes de cada check de ACL, que es también lo que hace al test significativo en GREEN.
-Segunda corrida: 11 failed, 0 passed. Es la misma familia que el defecto D1 y el CR scan roto — un
-check que no puede fallar de la manera que dice fallar.
+- **El CHECK sobre-restringido.** Una transacción inserta una fila de `job_inputs` con `ordinal = 2` y
+tiene que aceptarse. `CHECK (ordinal >= 1 AND ordinal <= 1)` satisface el regex que usa la suite de
+CHECK, y solo la ejecución distingue a los dos.
+- **Los defaults de §6.** Un test nuevo lee `column_default` de cada columna no-`id` de las seis tablas
+y exige **exactamente** los tres que el SQL canónico del diseño necesita. Una base que los dropeara
+antes pasaba las dieciocho aserciones y después fallaba los inserts del propio diseño en runtime.
 
-**Un hallazgo del linter corregido estructuralmente, no silenciado.** La primera versión de este
-archivo construía el SQL por interpolación (`SET ROLE "{role}"`) y le pasaba la sentencia a un helper
-como string; pi-lens lo marcó como un sink de inyección. Los nombres de rol son constantes de módulo,
-así que no era explotable — que es exactamente por qué silenciarlo habría sido la decisión
-equivocada. Se eliminó en cambio: `set_config('role', $1, false)` es la misma operación con el rol
-como parámetro enlazado, y el context manager `as_role` no recibe SQL en absoluto, así que las
-sentencias de denegación son literales en sus call sites. Resultado: `Python clean`.
+**Dos cosas que la medición corrigió en el camino.** Primero, los tests conductuales ahora manejan el
+**cliente generado** en vez de SQL crudo, y la aserción de ordinal duplicado pasó del SQLSTATE crudo
+`23505` al `P2002` de Prisma. Eso se midió, no se supuso: el test afirmó `P2002` y pasó en la primera
+corrida. Segundo, la regla `[sql-injection]` de pi-lens marca **cualquier** interpolación dentro de un
+statement crudo, incluida la forma tagged-template que Prisma parametriza — así que el arreglo fue
+dejar de escribir SQL crudo en esos dos tests y usar el cliente tipado, que es el que usa la
+aplicación. La regla no se silenció: el constructo que objeta ya no está, y el código quedó mejor.
 
-### 1.2 — verificación independiente, y qué cambió (2026-09-17)
+### 1.7 — el defecto de `client_id`, medido (2026-09-17)
 
-Veredicto: un RED genuino (solo fallas por ausencia, re-corrida de forma independiente), la matriz de
-privilegios del diseño coincidió **celda por celda en las dos direcciones**, y el fix del pase vacuo
-quedó confirmado como el nivel de aserción correcto — el verificador coincidió en que afirmar "PUBLIC
-no tiene nada" es la propiedad que importa y que rechazar un `relacl` NULL sería testear un efecto
-secundario.
+El supervisor preguntó por qué `submissions` tiene un `client_id` si no hay autenticación ni registro
+que asigne uno. La pregunta expuso dos cosas.
 
-**Refutado, y arreglado en esta unidad de trabajo:**
+**En ningún lado se define de dónde sale `client_id`.** Ni en el design, ni en la propuesta, ni en las
+specs, ni en el glosario. El glosario define `Submission` como "el evento y registro de un pedido del
+usuario: idempotency key, client id, timestamp, job_id resultante" — y se detiene ahí. Sin cuentas
+(AV13), ningún componente podía producirlo.
 
-- **La matriz barrió cuatro privilegios, no todos.** `GRANT TRUNCATE ON any_table TO either_role`
-  pasaba los once tests, contradiciendo la afirmación del propio docstring de que "toda otra
-  combinación debe estar ausente". El barrido ahora cubre los siete privilegios de tabla que tiene
-  PostgreSQL.
-- **§3 exige que las migraciones corran bajo el rol owner, y nada lo afirmaba.** Un owner puede
-  `ALTER` o `DROP` una tabla **sin tener ningún grant de DDL**, así que la denegación de DDL podría
-  haber sido vacua mientras toda otra aserción seguía verde. Un test nuevo afirma que ningún rol de
-  runtime es dueño de una tabla, de forma no vacua: afirma que las seis tablas existen antes de juzgar
-  a su owner.
-- **El header le daba el crédito a `.env.example`** por los nombres de variable. Ese archivo no existe
-  — el supervisor lo dropeó el 2026-09-16 — así que la procedencia es `design.md` §3, y el comentario
-  ahora dice solo eso.
+**Y como era nullable, la unicidad de la que era mitad no protegía nada.** PostgreSQL trata los NULL
+como distintos, así que `unique (client_id, idempotency_key)` permite filas ilimitadas con cliente
+NULL. Medido sobre la base migrada, en una transacción con rollback:
 
-**No medible, registrado en vez de asumido:** si `set_config('role', $1, false)` impone el mismo
-check de membresía que `SET ROLE` (construir una denegación de no-membresía requiere crear roles,
-fuera de la superficie autorizada del verificador; PostgreSQL documenta ambos como el mismo setting,
-y la falla por rol inexistente observada es un error de ausencia de cualquier manera); y si `REVOKE
-ALL FROM PUBLIC` puede dejar atrás un `aclitem` con cero privilegios (la dirección de la aserción es
-sólida de cualquier manera).
+```text
+NOTICE:  CASO 1 (client_id NULL): segundo INSERT ACEPTADO -> NO deduplica
+NOTICE:  CASO 1: filas con la misma key = 2
+NOTICE:  CASO 2 (client_id presente, jobs distintos): segundo INSERT RECHAZADO -> SI deduplica
+```
 
-**Residual, declarado en vez de implícito:** los grants a nivel columna viven en
-`pg_attribute.attacl` y no se barren. La matriz del diseño es a nivel tabla, y `has_table_privilege`
-sí devuelve true para privilegios de cualquier columna, así que un grant a nivel columna solo se
-atrapa donde toca los dos caminos de escritura ejecutados. Eso ahora está escrito en el header de la
-suite en vez de dejado para que un lector lo descubra.
+La consecuencia no es cosmética: C1 promete que un pedido repetido con la misma key devuelve el primer
+job. Para cualquier cliente que omitiera `client_id` — y nada lo obligaba a mandarlo — esa promesa se
+degradaba en silencio a "crear un segundo job".
 
-### 1.1 — verificación independiente, y qué cambió (2026-09-17)
+**Resolución:** `idempotency_key` pasa a NOT NULL y único global, y `client_id` se elimina. Sin
+cuentas, un namespace por cliente no agrega nada; una key UUID que genera el cliente hace las
+colisiones despreciables, y el agujero se cierra por construcción.
 
-La gate RDD de esta unidad de trabajo corrió un verificador independiente contra `schema.spec.ts`.
-Veredicto: la suite es un **RED genuino** — 11 de 11, cada falla confirmada como ausencia de schema,
-re-corrida de forma independiente — y **no es una gate completa**. Dos ítems encabezan, porque son
-defectos más que opiniones:
+**Los otros tres ítems, para el registro.** `error_class` y `event_type` pasaron a tipos enum, y el
+criterio está ahora en el header del schema. Los enums los generó Prisma mismo:
 
-1. **Un falso RED esperando en GREEN.** `uniqueColumnSets` lee `pg_constraint` (`contype IN ('u','p')`).
-   Prisma emite `CREATE UNIQUE INDEX` para `@unique` y `@@unique`, y un índice único no crea **ninguna**
-   fila de `pg_constraint`. Sobre un schema generado *correcto*, las cuatro aserciones de uniqueness
-   fallarían. La suite tiene que leer la uniqueness como **enforcement** (índices únicos, excluyendo
-   los parciales), no como filas de constraint — y la alternativa, editar a mano la migración para
-   convertir los uniques en constraints, sería contorsionar el schema para complacer a un test.
-2. **Una afirmación falsa en el propio header de este archivo, heredada del diseño.** El header
-   afirma que Prisma no puede expresar el enum `state`. Puede: Prisma tiene bloques de enum nativos y
-   genera `CREATE TYPE`. `design.md` §5 dice lo mismo y el `2.3` de WU-2 lo repite. Solo las tres
-   restricciones CHECK y el índice parcial son genuinamente inexpresables. `design.md` es la fuente de
-   solo lectura de esta feature y **no se edita acá**; el hallazgo se registra en cambio.
+```text
+CREATE TYPE "JobState" AS ENUM ('created', 'queued', 'running', 'succeeded', 'failed', 'canceled');
+CREATE TYPE "FailureClass" AS ENUM ('retryable', 'non_retryable');
+CREATE TYPE "OutboxEventType" AS ENUM ('job.queued');
+```
 
-**El hallazgo que decidió la respuesta.** El verificador construyó un único schema incorrecto que pasa
-**las once** aserciones: un orden de declaración de enum mezclado, `CHECK (error_class =
-'non_retryable')` (que satisface los tres regex de substring, incluyendo a `/retryable/` matcheando
-*adentro* de ese literal), `submissions` sin `creator_token_hash`, `artifacts.id` nullable y sin
-primary key, `outbox.payload` como `text`, un índice parcial irrelevante sobre `created_at`, y
-`jobs.artifact_id` apuntando a `submissions`. Una gate que admite ese schema no es una gate, así que
-la suite se fortalece **antes** del GREEN: una suite medida contra nada produce evidencia verde sobre
-nada.
+`OutboxEventType` necesitó `@map("job.queued")` en el valor del enum, porque un valor de enum de
+Prisma tiene que ser un identificador válido y `job.queued` no lo es. La etiqueta en la base conserva
+el punto que el diseño especifica.
 
-La lista de refuerzos, toda de esa revisión: leer la uniqueness desde los índices únicos; afirmar el
-orden declarado del enum además del conjunto de labels; anclar el regex del default `uuidv7()` en vez
-de matchear un substring; exigir la **columna principal** del índice parcial y no solo su predicado;
-comparar el conjunto de labels de `error_class` de forma exacta en vez de matchear substrings; afirmar
-las seis foreign keys esperadas **y** sus targets en vez de solo "toda FK existente está indexada";
-afirmar la nulabilidad en las dos direcciones para cada columna que el ERD marca nullable; afirmar una
-primary key en cada tabla; afirmar los conjuntos completos de columnas de `job_inputs`, `submissions`,
-`artifacts` y `outbox`, que no tenían ninguno; y ampliar las aserciones de tipo a las columnas `int`,
-`uuid`, `jsonb` y las `timestamptz` restantes.
+**Dos aclaraciones agregadas al vocabulario del propio design**, porque la confusión del supervisor la
+produjo la documentación y no él: `outbox` es el **patrón transactional outbox** (una escritura
+atómica del cambio de estado y la intención de dispatch, con un relay publicando después), no un log
+de eventos; y `submissions` es la **fila de propiedad e idempotencia** de un job (1:1), no un log de
+eventos. `design.md` §3 describe las tablas por cantidad de filas y no por propósito, que es lo que
+hizo que dos cosas distintas parecieran la misma.
 
 ## Fuera de alcance
 

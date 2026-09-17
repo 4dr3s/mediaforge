@@ -67,6 +67,12 @@ the repository wins. The ERD in §3 is the input.
    becomes `collect` / `empty_candidate_base_ref_required`, and *that* path dead-ends on a `lineageId`
    its own collect step never issues. `assess` fails schema validation on any candidate without a risk
    signal. Work-unit commits stay, because they are the recovery points and the reviewable units.
+4. **Data-model corrections from the supervisor's review of the artifacts (2026-09-17).** Three
+   changes, each with its own reason: `attempts.error_class` and `outbox.event_type` become **enum
+   types** (closed domains the design fixes), and `submissions` loses `client_id` while
+   `idempotency_key` becomes NOT NULL and globally unique. The third one fixes a **measured defect**,
+   not a style preference — see task 1.7 and the evidence log. The criterion for enum-versus-text is
+   now written in the schema header so the next column is not decided by accident.
 
 ## Tasks
 
@@ -221,9 +227,200 @@ and belongs in the log rather than in a habit.
 **Acceptance:** every work unit has an explicit tier-or-outcome line, and the independent verifier's
 findings are recorded with what was done about each one.
 
+### 1.7 — Data-model corrections from the supervisor's review · owner: AI
+
+Raised by the supervisor after reading the feature document and the created artifacts. Four items,
+three of them changes to the model and one a documentation fix.
+
+1. **`attempts.error_class` becomes the enum type `FailureClass`** (`retryable`, `non_retryable`). The
+   column was `text` plus a CHECK, while `jobs.state` — the same kind of closed domain — was already an
+   enum. The design stated no criterion for the difference, and the reason it gave in §5 ("constraints
+   Prisma cannot express") is false: Prisma generates `CREATE TYPE` for an enum. Converting it also
+   removes the CHECK, and with it the gap an independent verifier had constructed — a type cannot be
+   written in a way that forbids NULL on a column the design declares nullable.
+2. **`outbox.event_type` becomes the enum type `OutboxEventType`** (`job.queued`). The design fixes
+   the set; a type documents it and is how a second event is added.
+3. **`submissions` loses `client_id`; `idempotency_key` becomes NOT NULL and globally unique.** This is
+   a defect fix, measured, not a preference: see the evidence log.
+4. **The criterion is written down.** `job_type` stays text (a registry key, open by design) and both
+   `error_code` columns stay text (an open taxonomy the design expects to grow). The schema header now
+   states when each applies.
+
+**Acceptance:** the three enums exist in the live database with the declared labels; `submissions` has
+no `client_id` and rejects a repeated `idempotency_key`; both suites green; `migrate diff` reports no
+drift. Because the migration has **never left this machine** (the branch is local and `mediaforge_test`
+is its only destination), the change is folded into the initial migration instead of adding a second
+one — if it had been shared, a fixup migration would have been the only honest option.
+
+**Known divergence, recorded rather than hidden:** `design.md` §3 still shows `client_id`, `text`
+`error_class` and `text` `event_type`, and C1's spec still describes the `(client_id, key)` pair. The
+design and the specs are approved artifacts and this feature treats them as read-only, so the
+schema now **diverges from them on purpose**. Updating those two artifacts is the supervisor's call
+and is listed in *Out of scope* until it happens.
+
 ## Evidence log
 
 Raw output, appended as each task closes. Verbatim, not paraphrased.
+
+### 1.1 — RED: the schema contract suite (2026-09-17)
+
+```text
+$ pnpm --filter api --fail-if-no-match exec vitest run test/schema.spec.ts
+
+ test/schema.spec.ts (11 tests | 11 failed) 262ms
+   × schema :: tables exist > creates exactly the six tables of the ERD
+     → expected [] to deeply equal [ 'artifacts', 'attempts', …(4) ]
+   × schema :: the six states, and no seventh > types jobs.state as an enum whose labels are exactly the six canonical states
+     → jobs.state is missing: expected undefined to be defined
+   × schema :: uniqueness is enforced, and by the engine > declares the four unique column sets the ERD requires
+     → expected [] to deeply equally contain [ 'job_id', 'ordinal' ]
+   × schema :: uniqueness is enforced, and by the engine > rejects a duplicate (job_id, ordinal) with a real unique violation
+     → relation "jobs" does not exist
+   × schema :: no counter column on jobs > has exactly the ERD columns, and none of them is a counter
+     → expected [] to deeply equal [ 'id', 'job_type', 'params', …(6) ]
+   × schema :: no counter column on jobs > keeps attempts as rows: the table exists and is keyed per attempt
+     → expected [] to deeply equal [ 'id', 'job_id', 'attempt_no', …(7) ]
+   × schema :: ids are database-minted > defaults every primary key to uuidv7() except artifacts.id
+     → .toMatch() expects to receive a string, but got undefined
+   × schema :: the partial index the relay poll needs > indexes outbox (published_at) WHERE published_at IS NULL
+     → no partial outbox index; found:
+   × schema :: CHECK constraints Prisma cannot express > constrains ordinal, attempt_no and error_class
+     → expected '' to match /ordinal\s*>=\s*1/
+   × schema :: types are the ones the model declares > uses timestamptz, bigint and jsonb where the ERD says so
+     → expected undefined to be 'jsonb'
+   × schema :: every foreign key is indexed > has an index whose leading column is each foreign-key column
+     → expected 0 to be greater than 0
+
+ Test Files  1 failed (1)
+      Tests  11 failed (11)
+[exit=1]
+```
+
+**Why this is the right red.** Ten of the eleven fail because the catalog is empty, and the eleventh
+because the behavioral insert found no table (`relation "jobs" does not exist`). None failed on a
+syntax or type error inside the test file. That distinction is the whole point of recording a RED
+run: a malformed test also fails, and that failure would prove nothing about the schema.
+
+**A plumbing artifact worth recording.** A second run piped through `head -30` printed `exit=0`. That
+number came from the truncated pipe, not from a green suite — the authoritative exit code is the
+first run's `1`, taken without truncation. It is defect D1 in miniature: a status produced by the
+plumbing is not evidence about the thing being measured.
+
+**Linter advisory, not actioned.** pi-lens reported a **stale** knip finding for
+`apps/api/package.json`: `Unused devDependency @nestjs/schematics`. That package is not in the
+manifest (checked directly), so the finding does not reproduce and nothing was changed to silence
+it — the same disposition as findings F4/F5 in `repo-hygiene.md`.
+
+
+### 1.1 — independent verification, and what it changed (2026-09-17)
+
+The RDD gate for this work unit ran an independent verifier against `schema.spec.ts`. Verdict: the
+suite is a **genuine RED** — 11 of 11, every failure confirmed as absence-of-schema, re-run
+independently — and it is **not a complete gate**. Two items lead, because they are defects rather
+than opinions:
+
+1. **A false-RED waiting in GREEN.** `uniqueColumnSets` reads `pg_constraint` (`contype IN ('u','p')`).
+   Prisma emits `CREATE UNIQUE INDEX` for `@unique` and `@@unique`, and a unique index creates **no**
+   `pg_constraint` row. On a *correct* generated schema the four unique assertions would fail. The
+   suite has to read uniqueness as **enforcement** (unique indexes, partial ones excluded), not as
+   constraint rows — and the alternative, hand-editing the migration to convert uniques into
+   constraints, would be contorting the schema to please a test.
+2. **A false statement in this file's own header, inherited from the design.** The header claims
+   Prisma cannot express the `state` enum. It can: Prisma has native enum blocks and generates
+   `CREATE TYPE`. `design.md` §5 says the same thing and WU-2's `2.3` repeats it. Only the three CHECK
+   constraints and the partial index are genuinely inexpressible. `design.md` is this feature's
+   read-only source and is **not** edited here; the finding is recorded instead.
+
+**The finding that decided the response.** The verifier constructed a single wrong schema that passes
+**all eleven** assertions: a scrambled enum declaration order, `CHECK (error_class = 'non_retryable')`
+(which satisfies all three substring regexes, including `/retryable/` matching *inside* that literal),
+`submissions` without `creator_token_hash`, `artifacts.id` nullable and with no primary key,
+`outbox.payload` as `text`, an unrelated partial index on `created_at`, and `jobs.artifact_id`
+pointing at `submissions`. A gate that admits that schema is not a gate, so the suite is strengthened
+**before** GREEN: a suite measured against nothing produces green evidence about nothing.
+
+The strengthening list, all from that review: read uniqueness from unique indexes; assert the
+declared enum order as well as the label set; anchor the `uuidv7()` default regex instead of matching
+a substring; require the partial index's **leading column** and not only its predicate; compare the
+`error_class` label set exactly instead of matching substrings; assert the six expected foreign keys
+**and** their targets instead of only "every existing FK is indexed"; assert nullability in both
+directions for every column the ERD marks nullable; assert a primary key on every table; assert full
+column sets for `job_inputs`, `submissions`, `artifacts` and `outbox`, which had none; and widen the
+type assertions to the `int`, `uuid`, `jsonb` and remaining `timestamptz` columns.
+
+
+### 1.2 — RED: the least-privilege suite (2026-09-17)
+
+```text
+$ uv run --project workers/media pytest workers/media/tests/test_db_privileges.py -q
+
+E   asyncpg.exceptions.InvalidParameterValueError: role "mediaforge_api" does not exist
+=========================== short test summary info ===========================
+FAILED ...::test_both_runtime_roles_exist_without_superuser_power
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_api-granted0]
+FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_worker-granted1]
+FAILED ...::test_worker_cannot_reach_the_outbox
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_api]
+FAILED ...::test_neither_role_can_run_ddl[mediaforge_worker]
+FAILED ...::test_neither_role_can_delete[mediaforge_api]
+FAILED ...::test_neither_role_can_delete[mediaforge_worker]
+FAILED ...::test_public_holds_nothing_on_the_tables
+FAILED ...::test_worker_can_actually_claim_an_attempt_and_fence_a_job
+FAILED ...::test_api_can_actually_write_its_create_transaction
+11 failed in 0.99s
+[exit=1]
+```
+
+The failure reason is absence (`role "mediaforge_api" does not exist`), not a malformed file.
+
+**The first run passed one test, and that pass was vacuous.** Before the fix, the run was
+`10 failed, 1 passed`, and the pass was `test_public_holds_nothing_on_the_tables`: with no tables in
+`pg_class`, the ACL query returns nothing, and an empty result satisfies "no privilege leaked". Green
+for a reason unrelated to what is asserted. Fixed by asserting `to_regclass(table) IS NOT NULL`
+before each ACL check, which is also what makes the test meaningful in GREEN. Second run: 11 failed,
+0 passed. This is the same family as defect D1 and the broken CR scan — a check that cannot fail
+the way it claims to.
+
+**A linter finding fixed structurally, not silenced.** The first version of this file built SQL by
+interpolation (`SET ROLE "{role}"`) and passed the statement into a helper as a string; pi-lens
+flagged it as an injection sink. The role names are module constants, so it was not exploitable —
+which is precisely why silencing it would have been the wrong call. It was removed instead:
+`set_config('role', $1, false)` is the same operation with the role as a bound parameter, and the
+`as_role` context manager takes no SQL at all, so the denial statements are literals at their call
+sites. Result: `Python clean`.
+
+
+### 1.2 — independent verification, and what it changed (2026-09-17)
+
+Verdict: a genuine RED (absence failures only, independently re-run), the design's privilege matrix
+matched **cell by cell in both directions**, and the vacuous-pass fix was confirmed as the correct
+assertion level — the verifier agreed that asserting "PUBLIC holds nothing" is the property that
+matters and that rejecting a NULL `relacl` would be testing a side effect instead.
+
+**Refuted, and fixed in this work unit:**
+
+- **The matrix swept four privileges, not all of them.** `GRANT TRUNCATE ON any_table TO either_role`
+  passed all eleven tests, contradicting the docstring's own claim that "every other combination must
+  be absent". The sweep now covers all seven table privileges PostgreSQL has.
+- **§3 requires migrations to run under the owner role, and nothing asserted it.** An owner can
+  `ALTER` or `DROP` a table **without holding any DDL grant**, so the DDL denial could have been
+  meaningless while every other assertion stayed green. A new test asserts no runtime role owns a
+  table, non-vacuously: it asserts the six tables exist before judging their owner.
+- **The header credited `.env.example`** for the variable names. That file does not exist — the
+  supervisor dropped it on 2026-09-16 — so the provenance is `design.md` §3, and the comment now says
+  only that.
+
+**Not measurable, recorded instead of assumed:** whether `set_config('role', $1, false)` enforces the
+same membership check as `SET ROLE` (constructing a non-membership denial requires creating roles,
+outside the verifier's authorized surface; PostgreSQL documents both as the same setting, and the
+observed missing-role failure is an absence error either way); and whether `REVOKE ALL FROM PUBLIC`
+can leave a zero-privilege `aclitem` behind (the assertion's direction is sound either way).
+
+**Residual, stated rather than implied:** column-level grants live in `pg_attribute.attacl` and are
+not swept. The design's matrix is table-level, and `has_table_privilege` does return true for
+any-column privileges, so a column-level grant is caught only where it touches the two executed write
+paths. That is now written in the suite's header instead of being left for a reader to discover.
+
 
 ### 1.3 — GREEN: schema, migration, roles (2026-09-17)
 
@@ -240,6 +437,11 @@ change to the design's assumptions, not a dependency bump.
 > `pg`. O2 was never satisfied by this work unit — it is **task 1.4**, and it is still open. The claim
 > was written from reasoning about the adapter instead of from reading the manifest, which is exactly
 > the failure this project keeps finding in other people's documents.
+>
+> **Closed later the same day, in task 1.4.** Both halves are now true and measured: neither `pg` nor
+> `@types/pg` appears in any manifest in this repository, and no file imports `from 'pg'` — both suites
+> talk to PostgreSQL through the Prisma client. `@prisma/adapter-pg` still brings `pg` **transitively**,
+> which is expected and is the honest way to state it: the constraint is about the manifest.
 
 **A version trap, measured.** `npm view prisma dist-tags` reports `latest: 8.0.0-rc.15` — a release
 candidate under the `latest` tag — and `prev: 7.10.0`. `npx prisma` (which the schema linter reaches
@@ -333,6 +535,7 @@ the paths assumed a flat layout. In a pnpm workspace the binaries live under `ap
 and `dist` under `apps/api/dist`. The image was fine; the check was not. Listed here because the
 correction is the point: `docker run` is only evidence if the path is right.
 
+
 ### 1.3 — independent verification, and what it refuted (2026-09-17)
 
 Seven claims held: the live database matches the ERD §3/§4 with **zero divergence in either
@@ -362,164 +565,96 @@ assertions and built wrong databases that pass every one:
 3. **No assertion reads `column_default` for the three §6 defaults**, so a database that dropped them
    passes all eighteen and then fails the design's own canonical inserts at runtime.
 
-All three are closed in task 1.4's follow-up commit. The lesson is the same one this feature keeps
-producing from different angles: a catalog assertion proves what it reads, and nothing more.
+**Where those three stand — and a correction.** The first is closed **by construction**: `error_class`
+is now an enum type and the suite asserts the column stays nullable, so a CHECK that forbids NULL no
+longer exists to be written. The other two — the over-constrained `ordinal` CHECK and the three §6
+defaults — were **not** closed when this paragraph first claimed they were; saying "closed in the
+follow-up" before the assertions existed is the same failure this feature keeps finding, one level up.
+All three are now closed, in the 1.4 follow-up that moved this suite to the Prisma client: the
+over-constrained CHECK is caught behaviorally (an `ordinal = 2` row must be accepted) and the defaults
+are asserted by reading `column_default` and requiring **exactly** `attempts.created_at`,
+`outbox.created_at` and `outbox.attempts` — and no other column. The lesson stands either way: a
+catalog assertion proves what it reads, and nothing more.
 
-### 1.1 — RED: the schema contract suite (2026-09-17)
 
-```text
-$ pnpm --filter api --fail-if-no-match exec vitest run test/schema.spec.ts
+### 1.4 — O2 closed, and the two remaining suite gaps (2026-09-17)
 
- test/schema.spec.ts (11 tests | 11 failed) 262ms
-   × schema :: tables exist > creates exactly the six tables of the ERD
-     → expected [] to deeply equal [ 'artifacts', 'attempts', …(4) ]
-   × schema :: the six states, and no seventh > types jobs.state as an enum whose labels are exactly the six canonical states
-     → jobs.state is missing: expected undefined to be defined
-   × schema :: uniqueness is enforced, and by the engine > declares the four unique column sets the ERD requires
-     → expected [] to deeply equally contain [ 'job_id', 'ordinal' ]
-   × schema :: uniqueness is enforced, and by the engine > rejects a duplicate (job_id, ordinal) with a real unique violation
-     → relation "jobs" does not exist
-   × schema :: no counter column on jobs > has exactly the ERD columns, and none of them is a counter
-     → expected [] to deeply equal [ 'id', 'job_type', 'params', …(6) ]
-   × schema :: no counter column on jobs > keeps attempts as rows: the table exists and is keyed per attempt
-     → expected [] to deeply equal [ 'id', 'job_id', 'attempt_no', …(7) ]
-   × schema :: ids are database-minted > defaults every primary key to uuidv7() except artifacts.id
-     → .toMatch() expects to receive a string, but got undefined
-   × schema :: the partial index the relay poll needs > indexes outbox (published_at) WHERE published_at IS NULL
-     → no partial outbox index; found:
-   × schema :: CHECK constraints Prisma cannot express > constrains ordinal, attempt_no and error_class
-     → expected '' to match /ordinal\s*>=\s*1/
-   × schema :: types are the ones the model declares > uses timestamptz, bigint and jsonb where the ERD says so
-     → expected undefined to be 'jsonb'
-   × schema :: every foreign key is indexed > has an index whose leading column is each foreign-key column
-     → expected 0 to be greater than 0
-
- Test Files  1 failed (1)
-      Tests  11 failed (11)
-[exit=1]
-```
-
-**Why this is the right red.** Ten of the eleven fail because the catalog is empty, and the eleventh
-because the behavioral insert found no table (`relation "jobs" does not exist`). None failed on a
-syntax or type error inside the test file. That distinction is the whole point of recording a RED
-run: a malformed test also fails, and that failure would prove nothing about the schema.
-
-**A plumbing artifact worth recording.** A second run piped through `head -30` printed `exit=0`. That
-number came from the truncated pipe, not from a green suite — the authoritative exit code is the
-first run's `1`, taken without truncation. It is defect D1 in miniature: a status produced by the
-plumbing is not evidence about the thing being measured.
-
-**Linter advisory, not actioned.** pi-lens reported a **stale** knip finding for
-`apps/api/package.json`: `Unused devDependency @nestjs/schematics`. That package is not in the
-manifest (checked directly), so the finding does not reproduce and nothing was changed to silence
-it — the same disposition as findings F4/F5 in `repo-hygiene.md`.
-
-### 1.2 — RED: the least-privilege suite (2026-09-17)
+O2's two halves, measured rather than asserted: no `pg` and no `@types/pg` in any manifest in this
+repository, and no file importing `from 'pg'` — both suites reach PostgreSQL through the Prisma client
+built by `test/prisma-client.ts`. The adapter still depends on `pg` transitively; the constraint is
+about the manifest, and that is how it is reported.
 
 ```text
-$ uv run --project workers/media pytest workers/media/tests/test_db_privileges.py -q
-
-E   asyncpg.exceptions.InvalidParameterValueError: role "mediaforge_api" does not exist
-=========================== short test summary info ===========================
-FAILED ...::test_both_runtime_roles_exist_without_superuser_power
-FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_api-granted0]
-FAILED ...::test_the_privilege_matrix_is_exactly_as_designed[mediaforge_worker-granted1]
-FAILED ...::test_worker_cannot_reach_the_outbox
-FAILED ...::test_neither_role_can_run_ddl[mediaforge_api]
-FAILED ...::test_neither_role_can_run_ddl[mediaforge_worker]
-FAILED ...::test_neither_role_can_delete[mediaforge_api]
-FAILED ...::test_neither_role_can_delete[mediaforge_worker]
-FAILED ...::test_public_holds_nothing_on_the_tables
-FAILED ...::test_worker_can_actually_claim_an_attempt_and_fence_a_job
-FAILED ...::test_api_can_actually_write_its_create_transaction
-11 failed in 0.99s
-[exit=1]
+$ grep -rn "from 'pg'" apps workers        -> NINGUNO
+$ grep -n '"pg"|@types/pg' apps/api/package.json -> NO esta en el manifiesto
+$ pnpm test:api     -> Test Files 2 passed (2) · Tests 24 passed (24)   [exit=0]
+$ pnpm test:worker  -> 14 passed in 0.76s                              [exit=0]
+$ prisma migrate diff --from-config-datasource --to-schema --exit-code -> No difference detected [exit=0]
 ```
 
-The failure reason is absence (`role "mediaforge_api" does not exist`), not a malformed file.
+The two remaining verifier gaps are closed **behaviorally**, not by tightening a regex:
 
-**The first run passed one test, and that pass was vacuous.** Before the fix, the run was
-`10 failed, 1 passed`, and the pass was `test_public_holds_nothing_on_the_tables`: with no tables in
-`pg_class`, the ACL query returns nothing, and an empty result satisfies "no privilege leaked". Green
-for a reason unrelated to what is asserted. Fixed by asserting `to_regclass(table) IS NOT NULL`
-before each ACL check, which is also what makes the test meaningful in GREEN. Second run: 11 failed,
-0 passed. This is the same family as defect D1 and the broken CR scan — a check that cannot fail
-the way it claims to.
+- **The over-constrained CHECK.** A transaction inserts a `job_inputs` row with `ordinal = 2` and must
+  be accepted. `CHECK (ordinal >= 1 AND ordinal <= 1)` satisfies the regex the CHECK suite uses, and
+  only execution tells the two apart.
+- **The §6 defaults.** A new test reads `column_default` for every non-`id` column of the six tables
+  and requires **exactly** the three the design's canonical SQL needs. A database that dropped them
+  used to pass all eighteen assertions and then fail the design's own inserts at runtime.
 
-**A linter finding fixed structurally, not silenced.** The first version of this file built SQL by
-interpolation (`SET ROLE "{role}"`) and passed the statement into a helper as a string; pi-lens
-flagged it as an injection sink. The role names are module constants, so it was not exploitable —
-which is precisely why silencing it would have been the wrong call. It was removed instead:
-`set_config('role', $1, false)` is the same operation with the role as a bound parameter, and the
-`as_role` context manager takes no SQL at all, so the denial statements are literals at their call
-sites. Result: `Python clean`.
+**Two things measurement corrected along the way.** First, the behavioral tests now drive the
+**generated client** rather than raw SQL, and the duplicate-ordinal assertion changed from the raw
+SQLSTATE `23505` to Prisma's `P2002`. That was measured, not assumed: the test asserted `P2002` and
+passed on the first run. Second, pi-lens's `[sql-injection]` rule flags **any** interpolation inside a
+raw statement, including the tagged-template form Prisma parameterizes — so the fix was to stop
+writing raw SQL in those two tests and use the typed client, which is the client the application uses.
+The rule was not suppressed; the construct it objects to is gone, and the code is better for it.
 
-### 1.2 — independent verification, and what it changed (2026-09-17)
+### 1.7 — the `client_id` defect, measured (2026-09-17)
 
-Verdict: a genuine RED (absence failures only, independently re-run), the design's privilege matrix
-matched **cell by cell in both directions**, and the vacuous-pass fix was confirmed as the correct
-assertion level — the verifier agreed that asserting "PUBLIC holds nothing" is the property that
-matters and that rejecting a NULL `relacl` would be testing a side effect instead.
+The supervisor asked why `submissions` has a `client_id` when there is no authentication and no
+registration to assign one. The question exposed two things.
 
-**Refuted, and fixed in this work unit:**
+**Nothing anywhere defines where `client_id` comes from.** Not the design, not the proposal, not the
+specs, not the glossary. The glossary defines `Submission` as "the API-level event and record of a
+user's request: idempotency key, client id, timestamp, resulting `job_id`" — and stops there. With no
+accounts (AV13), no component could produce it.
 
-- **The matrix swept four privileges, not all of them.** `GRANT TRUNCATE ON any_table TO either_role`
-  passed all eleven tests, contradicting the docstring's own claim that "every other combination must
-  be absent". The sweep now covers all seven table privileges PostgreSQL has.
-- **§3 requires migrations to run under the owner role, and nothing asserted it.** An owner can
-  `ALTER` or `DROP` a table **without holding any DDL grant**, so the DDL denial could have been
-  meaningless while every other assertion stayed green. A new test asserts no runtime role owns a
-  table, non-vacuously: it asserts the six tables exist before judging their owner.
-- **The header credited `.env.example`** for the variable names. That file does not exist — the
-  supervisor dropped it on 2026-09-16 — so the provenance is `design.md` §3, and the comment now says
-  only that.
+**And because it was nullable, the uniqueness it was half of protected nothing.** PostgreSQL treats
+NULLs as distinct, so `unique (client_id, idempotency_key)` allows unlimited rows with a NULL client.
+Measured on the migrated database, in a rolled-back transaction:
 
-**Not measurable, recorded instead of assumed:** whether `set_config('role', $1, false)` enforces the
-same membership check as `SET ROLE` (constructing a non-membership denial requires creating roles,
-outside the verifier's authorized surface; PostgreSQL documents both as the same setting, and the
-observed missing-role failure is an absence error either way); and whether `REVOKE ALL FROM PUBLIC`
-can leave a zero-privilege `aclitem` behind (the assertion's direction is sound either way).
+```text
+NOTICE:  CASO 1 (client_id NULL): segundo INSERT ACEPTADO -> NO deduplica
+NOTICE:  CASO 1: filas con la misma key = 2
+NOTICE:  CASO 2 (client_id presente, jobs distintos): segundo INSERT RECHAZADO -> SI deduplica
+```
 
-**Residual, stated rather than implied:** column-level grants live in `pg_attribute.attacl` and are
-not swept. The design's matrix is table-level, and `has_table_privilege` does return true for
-any-column privileges, so a column-level grant is caught only where it touches the two executed write
-paths. That is now written in the suite's header instead of being left for a reader to discover.
+The consequence is not cosmetic: C1 promises that a repeated submission carrying the same key returns
+the first job. For any client that omitted `client_id` — which nothing required it to send — that
+promise silently degraded into "create a second job".
 
-### 1.1 — independent verification, and what it changed (2026-09-17)
+**Resolution:** `idempotency_key` becomes NOT NULL and globally unique, and `client_id` is removed.
+Without accounts, a per-client namespace adds nothing; a client-generated UUID key makes collisions
+negligible, and the hole closes by construction.
 
-The RDD gate for this work unit ran an independent verifier against `schema.spec.ts`. Verdict: the
-suite is a **genuine RED** — 11 of 11, every failure confirmed as absence-of-schema, re-run
-independently — and it is **not a complete gate**. Two items lead, because they are defects rather
-than opinions:
+**The other three items, for the record.** `error_class` and `event_type` became enum types, and the
+criterion is now in the schema header. The enums were generated by Prisma itself:
 
-1. **A false-RED waiting in GREEN.** `uniqueColumnSets` reads `pg_constraint` (`contype IN ('u','p')`).
-   Prisma emits `CREATE UNIQUE INDEX` for `@unique` and `@@unique`, and a unique index creates **no**
-   `pg_constraint` row. On a *correct* generated schema the four unique assertions would fail. The
-   suite has to read uniqueness as **enforcement** (unique indexes, partial ones excluded), not as
-   constraint rows — and the alternative, hand-editing the migration to convert uniques into
-   constraints, would be contorting the schema to please a test.
-2. **A false statement in this file's own header, inherited from the design.** The header claims
-   Prisma cannot express the `state` enum. It can: Prisma has native enum blocks and generates
-   `CREATE TYPE`. `design.md` §5 says the same thing and WU-2's `2.3` repeats it. Only the three CHECK
-   constraints and the partial index are genuinely inexpressible. `design.md` is this feature's
-   read-only source and is **not** edited here; the finding is recorded instead.
+```text
+CREATE TYPE "JobState" AS ENUM ('created', 'queued', 'running', 'succeeded', 'failed', 'canceled');
+CREATE TYPE "FailureClass" AS ENUM ('retryable', 'non_retryable');
+CREATE TYPE "OutboxEventType" AS ENUM ('job.queued');
+```
 
-**The finding that decided the response.** The verifier constructed a single wrong schema that passes
-**all eleven** assertions: a scrambled enum declaration order, `CHECK (error_class = 'non_retryable')`
-(which satisfies all three substring regexes, including `/retryable/` matching *inside* that literal),
-`submissions` without `creator_token_hash`, `artifacts.id` nullable and with no primary key,
-`outbox.payload` as `text`, an unrelated partial index on `created_at`, and `jobs.artifact_id`
-pointing at `submissions`. A gate that admits that schema is not a gate, so the suite is strengthened
-**before** GREEN: a suite measured against nothing produces green evidence about nothing.
+`OutboxEventType` needed `@map("job.queued")` on the enum value, because a Prisma enum value must be a
+valid identifier and `job.queued` is not. The database label keeps the dot the design specifies.
 
-The strengthening list, all from that review: read uniqueness from unique indexes; assert the
-declared enum order as well as the label set; anchor the `uuidv7()` default regex instead of matching
-a substring; require the partial index's **leading column** and not only its predicate; compare the
-`error_class` label set exactly instead of matching substrings; assert the six expected foreign keys
-**and** their targets instead of only "every existing FK is indexed"; assert nullability in both
-directions for every column the ERD marks nullable; assert a primary key on every table; assert full
-column sets for `job_inputs`, `submissions`, `artifacts` and `outbox`, which had none; and widen the
-type assertions to the `int`, `uuid`, `jsonb` and remaining `timestamptz` columns.
+**Two clarifications added to the design's own vocabulary**, because the supervisor's confusion was
+produced by the documentation and not by him: `outbox` is the **transactional outbox pattern** (one
+atomic write of the state change and the dispatch intent, with a relay publishing afterwards), not an
+event log; and `submissions` is the **ownership and idempotency row** for one job (1:1), not an event
+log. `design.md` §3 describes the tables by row count and not by purpose, which is what made two
+different things look like the same thing.
 
 ## Out of scope
 
