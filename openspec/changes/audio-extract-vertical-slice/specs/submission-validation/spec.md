@@ -165,16 +165,24 @@ be recorded or used as a valid input.
 ### Requirement: Submission Is Idempotent per Client Key
 
 The API MUST accept a client-supplied `Idempotency-Key` and MUST persist it in the `submissions`
-record under a unique `(client_id, key)` constraint. A repeated submission carrying the same
-client id and key MUST return the job and response of the first submission and MUST NOT create a
-second job. A submission without a key is a legitimate new job.
+record under a unique constraint on the key alone. A repeated submission carrying the same key MUST
+return the job and response of the first submission and MUST NOT create a second job. A submission
+without a key is a legitimate new job.
+
+> **Amended 2026-09-17 (WU-2).** This requirement used to scope the constraint to a pair,
+> `(client_id, key)`. There are no accounts (AV13) and nothing in this change ever defined where a
+> `client_id` would come from, so the pair could not be enforced in practice — and because the column
+> was nullable, PostgreSQL's treatment of NULLs as distinct meant the constraint deduplicated nothing
+> at all for any client that omitted it. Measured on the migrated database: two submissions with the
+> same key and a NULL client were both accepted. The key is now unique on its own, which makes the
+> guarantee below true instead of conditional. See `design.md` §3.
 
 #### Scenario: A double submission with the same key yields one job
 
-- GIVEN a completed submission for client `c1` with key `k1`
-- WHEN the same client resubmits with `c1` and `k1`
+- GIVEN a completed submission with key `k1`
+- WHEN the same key `k1` is submitted again
 - THEN the API returns the existing `job_id`
-- AND exactly one `jobs` row exists for that submission pair
+- AND exactly one `jobs` row exists for that key
 
 #### Scenario: A submission without a key creates a new job
 
