@@ -125,13 +125,41 @@ Los tests de harness del host **no** necesitan ninguna variable: `test/harness.s
 base, y Redis base 1. Si cambiás `POSTGRES_PORT` o `REDIS_PORT`, tenés que exportar además las dos
 URLs `_TEST` en tu shell, o los tests siguen mirando los puertos viejos.
 
+## Historial de git
+
+Cuatro commits en `main`, creados el 2026-09-16, cada uno una unidad revisable en vez de una
+importación en bloque:
+
+| Commit | Asunto | Tamaño |
+| --- | --- | --- |
+| `b05afcd` | `chore(sdd): import the approved SDD artifacts for audio-extract-vertical-slice` | 24 archivos, 5798 inserciones |
+| `892f706` | `docs(odd): track the S1 foundation rebuild as an ODD feature` | 2 archivos, 1176 inserciones |
+| `9d05ebd` | `feat(scaffold): pnpm workspace, NestJS api, uv worker project and dependency harness` | 20 archivos, 4363 inserciones |
+| `ab47532` | `feat(docker): local stack with PostgreSQL 18, Redis 7 and both service images` | 6 archivos, 331 inserciones |
+
+El remoto `origin` es `https://github.com/4dr3s/mediaforge.git`, verificado público y **vacío**
+antes del primer commit (`git ls-remote` no devolvió refs), así que no hizo falta merge. **Todavía
+no se pusheó nada.**
+
 ## Inconsistencias conocidas que quedan (decisiones abiertas)
 
 - `openspec/changes/audio-extract-vertical-slice/tasks.md` sigue diciendo `7/74 complete`
   (1.1–1.4, 5.1, 5.2, 13.2). Esos checkboxes acreditan hoy artefactos que ya no existen.
 - El registro de runtime del SDD `.git/gentle-ai/sdd-runtime/v1/audio-extract-vertical-slice/`
   tiene un `attempt/begin` de S1 sin `end`; `gentle-ai sdd-status` sigue reportando `next: apply`.
-- El repositorio no tenía commits, así que no había baseline contra la cual diffear.
+- **Fin de línea (encontrado al commitear, 2026-09-16).** Cada `git add` avisó *"LF will be
+  replaced by CRLF the next time Git touches it"* — `core.autocrlf=true` en esta máquina. El
+  contenido se guarda con LF y la copia de trabajo recibe CRLF. Inofensivo para Markdown, JSON,
+  TypeScript y Python; **no** inofensivo para un script de shell o un entrypoint que se copia
+  dentro de un contenedor Linux, que falla de maneras que parecen cualquier cosa menos fin de
+  línea. El scaffold borrado tenía exactamente un script así
+  (`workers/media/spikes/sandbox_namespace_precheck.sh`), así que esto va a volver. Recomendación:
+  un `.gitattributes` que fuerce LF donde el consumidor es el contenedor. Decisión del supervisor.
+- **Historial y remoto de git (2026-09-16).** Cuatro commits en `main`; `origin` apuntando a
+  `https://github.com/4dr3s/mediaforge.git`, verificado público y vacío. Nada pusheado.
+- **El repositorio no tenía ningún commit hasta esta sesión**, así que no hay baseline contra la
+  cual diffear la reconstrucción. El tarball de seguridad sigue siendo la única copia del output
+  de S1 borrado.
 - **`make` no está instalado en esta máquina** (`/usr/bin/bash: make: command not found`, exit
   `127`). El `Makefile` se conserva para Linux y CI, donde es el entrypoint canónico, y los scripts
   de `package.json` (`pnpm test:api`, `pnpm test:worker`) son el camino portable que funciona acá.

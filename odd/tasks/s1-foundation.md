@@ -119,6 +119,21 @@ The host-side harness tests need **no** variables at all: `test/harness.spec.ts`
 Redis database 1. Change `POSTGRES_PORT` or `REDIS_PORT` and the two `_TEST` URLs must be exported
 in your shell too, or the tests keep looking at the old ports.
 
+## Git history
+
+Four commits on `main`, created 2026-09-16, each a reviewable unit rather than one bulk import:
+
+| Commit | Subject | Size |
+| --- | --- | --- |
+| `b05afcd` | `chore(sdd): import the approved SDD artifacts for audio-extract-vertical-slice` | 24 files, 5798 insertions |
+| `892f706` | `docs(odd): track the S1 foundation rebuild as an ODD feature` | 2 files, 1176 insertions |
+| `9d05ebd` | `feat(scaffold): pnpm workspace, NestJS api, uv worker project and dependency harness` | 20 files, 4363 insertions |
+| `ab47532` | `feat(docker): local stack with PostgreSQL 18, Redis 7 and both service images` | 6 files, 331 insertions |
+
+Remote `origin` is `https://github.com/4dr3s/mediaforge.git`, verified public and **empty** before
+the first commit (`git ls-remote` returned no refs), so no merge was needed. **Nothing has been
+pushed yet.**
+
 ## Known inconsistencies left behind (open decisions)
 
 - `openspec/changes/audio-extract-vertical-slice/tasks.md` still shows `7/74 complete`
@@ -126,7 +141,18 @@ in your shell too, or the tests keep looking at the old ports.
 - The SDD runtime record `.git/gentle-ai/sdd-runtime/v1/audio-extract-vertical-slice/` holds an
   `attempt/begin` for S1 with no matching `end`; `gentle-ai sdd-status` still reports
   `next: apply`.
-- The repository has no commits, so there is no baseline to diff against.
+- **Line endings (found while committing, 2026-09-16).** Every `git add` warned *"LF will be
+  replaced by CRLF the next time Git touches it"* — `core.autocrlf=true` on this machine. Content
+  is stored with LF and the working copy gets CRLF. Harmless for Markdown, JSON, TypeScript and
+  Python; **not** harmless for a shell script or an entrypoint copied into a Linux container,
+  which fails in ways that look like anything except line endings. The deleted scaffold had
+  exactly such a script (`workers/media/spikes/sandbox_namespace_precheck.sh`), so this will come
+  back. Recommendation: a `.gitattributes` forcing LF where the container is the consumer.
+  Supervisor's call.
+- **Git history and remote (2026-09-16).** Four commits on `main`; `origin` set to
+  `https://github.com/4dr3s/mediaforge.git`, verified public and empty. Nothing pushed.
+- **The repository had no commits until this session**, so there is no baseline to diff the
+  rebuild against. The safety-net tarball remains the only copy of the deleted S1 output.
 - **`make` is not installed on this machine** (`/usr/bin/bash: make: command not found`,
   exit `127`). The `Makefile` is kept for Linux and CI, where it is the canonical entrypoint, and
   the root `package.json` scripts (`pnpm test:api`, `pnpm test:worker`) are the portable path that
