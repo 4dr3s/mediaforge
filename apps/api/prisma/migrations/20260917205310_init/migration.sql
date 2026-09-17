@@ -1,6 +1,12 @@
 -- CreateEnum
 CREATE TYPE "JobState" AS ENUM ('created', 'queued', 'running', 'succeeded', 'failed', 'canceled');
 
+-- CreateEnum
+CREATE TYPE "FailureClass" AS ENUM ('retryable', 'non_retryable');
+
+-- CreateEnum
+CREATE TYPE "OutboxEventType" AS ENUM ('job.queued');
+
 -- CreateTable
 CREATE TABLE "jobs" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
@@ -39,7 +45,7 @@ CREATE TABLE "attempts" (
     "lease_expires_at" TIMESTAMPTZ(6) NOT NULL,
     "started_at" TIMESTAMPTZ(6) NOT NULL,
     "ended_at" TIMESTAMPTZ(6),
-    "error_class" TEXT,
+    "error_class" "FailureClass",
     "error_code" TEXT,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -50,8 +56,7 @@ CREATE TABLE "attempts" (
 CREATE TABLE "submissions" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "job_id" UUID NOT NULL,
-    "client_id" TEXT,
-    "idempotency_key" TEXT,
+    "idempotency_key" TEXT NOT NULL,
     "creator_token_hash" TEXT NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -77,7 +82,7 @@ CREATE TABLE "artifacts" (
 CREATE TABLE "outbox" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "job_id" UUID NOT NULL,
-    "event_type" TEXT NOT NULL,
+    "event_type" "OutboxEventType" NOT NULL,
     "payload" JSONB NOT NULL,
     "published_at" TIMESTAMPTZ(6),
     "attempts" INTEGER NOT NULL DEFAULT 0,
@@ -99,7 +104,7 @@ CREATE UNIQUE INDEX "attempts_job_id_attempt_no_key" ON "attempts"("job_id", "at
 CREATE UNIQUE INDEX "submissions_job_id_key" ON "submissions"("job_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "submissions_client_id_idempotency_key_key" ON "submissions"("client_id", "idempotency_key");
+CREATE UNIQUE INDEX "submissions_idempotency_key_key" ON "submissions"("idempotency_key");
 
 -- CreateIndex
 CREATE INDEX "artifacts_job_id_idx" ON "artifacts"("job_id");
@@ -129,8 +134,12 @@ ALTER TABLE "outbox" ADD CONSTRAINT "outbox_job_id_fkey" FOREIGN KEY ("job_id") 
 -- WU-2 hand-edits.
 --
 -- Prisma cannot express the following, so they are appended to the generated migration instead of
--- living in a second file: `design.md` §5 makes this file the single DDL authority. The `state`
--- enum is NOT here -- Prisma expressed it above with `CREATE TYPE`, contrary to §5's wording.
+-- living in a second file: `design.md` §5 makes this file the single DDL authority.
+--
+-- The `state`, `error_class` and `event_type` enums are NOT here: Prisma expressed all three with
+-- `CREATE TYPE`, contrary to §5's wording. That also removes the CHECK that used to constrain
+-- `error_class`: a type already rejects a third value, and unlike a CHECK it cannot be written in a
+-- way that forbids NULL on a column the design declares nullable.
 --
 -- Referential actions were chosen by Prisma, not by this design: RESTRICT on every required
 -- relation and SET NULL on the optional `jobs.artifact_id`. No runtime role holds DELETE, so they
@@ -139,8 +148,6 @@ ALTER TABLE "outbox" ADD CONSTRAINT "outbox_job_id_fkey" FOREIGN KEY ("job_id") 
 -- 1. CHECK constraints ------------------------------------------------------
 ALTER TABLE "job_inputs" ADD CONSTRAINT "job_inputs_ordinal_positive" CHECK ("ordinal" >= 1);
 ALTER TABLE "attempts" ADD CONSTRAINT "attempts_attempt_no_positive" CHECK ("attempt_no" >= 1);
-ALTER TABLE "attempts" ADD CONSTRAINT "attempts_error_class_allowed"
-  CHECK ("error_class" IS NULL OR "error_class" IN ('retryable', 'non_retryable'));
 
 -- 2. The partial index the relay poll needs (C3) ----------------------------
 CREATE INDEX "outbox_unpublished_idx" ON "outbox" ("published_at") WHERE "published_at" IS NULL;

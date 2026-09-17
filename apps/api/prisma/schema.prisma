@@ -20,6 +20,18 @@
 //   2. **`@db.Timestamptz(6)` is written on every timestamp column on purpose.** Prisma's implicit
 //      mapping for `DateTime` on PostgreSQL is `timestamp(3)` *without* time zone; the ERD requires
 //      `timestamptz` everywhere, and the difference is a silent timezone bug rather than an error.
+//   3. **Enums are for domains the design fixes; text is for keys and taxonomies that grow.**
+//      `state`, `error_class` and `event_type` are closed sets decided by the design, so they are
+//      enum types. `job_type` is a registry key (`contracts/job-types.json`) and `error_code` is an
+//      open taxonomy — the design's own `explore.md` anticipates new `error_code` values — so an enum
+//      there would force a migration per new job type or error code and duplicate the registry.
+//      The design used an enum for one closed domain and a CHECK for another; this file states the
+//      criterion so the next column is not decided by accident.
+//   4. **Idempotency is one globally unique key, not a `(client, key)` pair.** The pair needed a
+//      `client_id` whose origin the design never defined anywhere, and because it was nullable,
+//      PostgreSQL treats NULLs as distinct: measured on the migrated database, two submissions with
+//      the same key and a NULL client were both accepted, so C1's guarantee silently did not hold for
+//      any client that omitted the field. A single NOT NULL unique key closes that hole.
 
 generator client {
   // Prisma 7's generator. It is not `prisma-client-js` any more, and it requires an explicit
@@ -44,6 +56,20 @@ enum JobState {
   succeeded
   failed
   canceled
+}
+
+/// The two failure classes of C4. Closed by the design, so it is a type and not a CHECK: a CHECK
+/// cannot stop a third value being added by an ALTER, and it cannot stop a CHECK that forbids NULL
+/// from being written by mistake.
+enum FailureClass {
+  retryable
+  non_retryable
+}
+
+/// The dispatch events the outbox may carry. One value today (`job.queued`, C3); the type is how a
+/// second one is added. The Prisma identifier cannot contain a dot, so the database label is mapped.
+enum OutboxEventType {
+  job_queued @map("job.queued")
 }
 
 /// One row per job. `attempts_used` is deliberately absent: it is derived from the `attempts` table
@@ -106,7 +132,8 @@ model Attempt {
   startedAt      DateTime  @map("started_at") @db.Timestamptz(6)
   /// NULL means the attempt is still held.
   endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
-  errorClass     String?   @map("error_class")
+  /// NULL means the attempt has not failed; a value means it did, and which class.
+  errorClass     FailureClass? @map("error_class")
   errorCode      String?   @map("error_code")
   /// Default required by `design.md` §6 line 379: the canonical T4 insert omits `created_at`.
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -117,21 +144,19 @@ model Attempt {
   @@map("attempts")
 }
 
-/// One submission per job. `creator_token_hash` stores a SHA-256 of the token; the token itself is
-/// never persisted, and a bare `job_id` without the token is not an authorization path (C8).
+/// One submission per job: the ownership row (the capability token) and the idempotency key.
 model Submission {
   id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
   jobId            String   @unique @map("job_id") @db.Uuid
-  clientId         String?  @map("client_id")
-  idempotencyKey   String?  @map("idempotency_key")
+  /// Client-supplied, NOT NULL and globally unique. See rule 4 in this file's header: the nullable
+  /// `(client_id, key)` pair this replaces could not deduplicate, because PostgreSQL treats NULLs as
+  /// distinct.
+  idempotencyKey   String   @unique @map("idempotency_key")
   creatorTokenHash String   @map("creator_token_hash")
   createdAt        DateTime @map("created_at") @db.Timestamptz(6)
 
   job Job @relation(fields: [jobId], references: [id])
 
-  /// The idempotency pair (C1). Both halves are nullable on purpose, and PostgreSQL treats NULLs as
-  /// distinct, so any number of keyless submissions coexist while a repeated key is rejected.
-  @@unique([clientId, idempotencyKey])
   @@map("submissions")
 }
 
@@ -168,7 +193,7 @@ model Artifact {
 model Outbox {
   id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   jobId       String    @map("job_id") @db.Uuid
-  eventType   String    @map("event_type")
+  eventType   OutboxEventType @map("event_type")
   payload     Json
   /// NULL means unpublished: the relay poll selects on exactly this.
   publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
