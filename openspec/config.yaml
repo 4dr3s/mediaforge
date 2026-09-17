@@ -1,0 +1,74 @@
+# OpenSpec configuration — MediaForge
+# SDD session configuration written by the sdd-init phase.
+# User-maintained SDD choices live here; edit deliberately.
+
+project:
+  name: mediaforge
+  product: MediaForge
+  description: >
+    Asynchronous file-processing platform. Input is an uploaded file or a
+    public URL; a worker processes it; the output is a downloadable artifact.
+    The real subject is the job pipeline (queue, retries, idempotency, progress
+    reporting, storage lifecycle, resource limits), not the media libraries.
+  governing_objective: verifiable-portfolio-evidence
+  billable: future-consequence-not-a-design-criterion
+
+schema: spec-driven
+
+delivery:
+  execution_mode: interactive
+  delivery_strategy: auto-chain   # decided 2026-09-16 for this change (was ask-on-risk)
+  delivery_strategy_domain: [ask-on-risk, auto-chain, single-pr, exception-ok]
+  review_budget_lines: 400   # canonical threshold, deliberately NOT recalibrated
+  chain_strategy: stacked-to-main   # selected 2026-09-16; slices S1..S5, each PR on the previous
+  exception_ok: true   # explicitly accepted by the user 2026-09-16; never inferred
+  exception_note: >
+    Explicit `size:exception` acceptance for `audio-extract-vertical-slice`. The task plan
+    (tasks.md, Review Workload Forecast) estimates ~5,700-7,400 authored lines, and the smallest
+    coherent slice (S2) is ~870-1,130 lines, so no chain split reaches the 400-line budget. The
+    exception is recorded rather than hidden, and the budget is left at 400 rather than
+    recalibrated. Chaining still cuts per-PR review from ~6,000 lines to ~900-1,500 and keeps
+    each PR coherent.
+
+phase_rules:
+  interactive_gate: >
+    Complete only the current SDD phase. Do not start the next phase unless the
+    current user turn explicitly approves that next phase.
+  approval_scope: >
+    In interactive mode, words like "continue", "dale", or "go on" approve only
+    the immediate next phase, not all remaining phases.
+  proposal_question_round: >
+    Before writing a proposal, offer the user 3-5 concrete product questions to
+    uncover business rules, implications, impact, edge cases, product tradeoffs,
+    and decision gaps. Prefer product questions; do not ask about test commands,
+    PR shape, changed-line budget, or other harness mechanics at proposal time
+    unless the user explicitly asks to discuss delivery.
+  open_question_rule: >
+    If a product question goes unanswered, record it as an assumption to
+    validate, never as a decided fact.
+  consent_gates:
+    - human-controlled consent
+    - authorization
+    - security
+    - destructive / publishing actions
+    - ambiguous scope
+    - size:exception
+
+testing:
+  strict_tdd: true
+  test_runner: "Vitest (API, TypeScript) + pytest (worker, Python)"
+  test_command: >
+    API: pnpm --filter api exec vitest run <file>  ·
+    Worker: uv run --project workers/media pytest workers/media/tests/<file> -q
+  test_runner_note: >
+    Chosen in sdd-design (design.md §11); Playwright rejected because this slice has no web UI.
+    Tests run against a real PostgreSQL 18 and a real Redis, never SQLite: uuidv7(), partial
+    indexes, FOR UPDATE and CAS semantics are Postgres-specific, so SQLite would produce false
+    negatives. Fencing and CAS tests use real concurrency (two live connections), never
+    transaction rollback.
+  note: >
+    The Python media worker must create its own environment with uv. The PATH python is an
+    unrelated hermes-agent virtualenv and must never be treated as the project runtime.
+
+# Bounded contexts / capabilities are determined in sdd-explore, not here.
+specs: {}
