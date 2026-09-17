@@ -1,12 +1,13 @@
 // WU-2 — the authoritative data model, realized from `design.md` §3 (the ERD is the authority for
 // entities, columns, types, uniques and indexes) and §4 (UUID strategy).
 //
-// What this file does NOT contain, and why: three CHECK constraints (`ordinal >= 1`,
-// `attempt_no >= 1`, `error_class IN (...)`) and the partial index
+// What this file does NOT contain, and why: two CHECK constraints (`ordinal >= 1`,
+// `attempt_no >= 1`) and the partial index
 // `outbox (published_at) WHERE published_at IS NULL` are not expressible in Prisma's schema
 // language. They are hand-edited into the generated migration, which stays the single DDL authority
-// (`design.md` §5). The `state` enum, contrary to §5's wording, **is** expressible — Prisma has
-// native enum blocks and generates `CREATE TYPE` — so it is declared here rather than hand-added.
+// (`design.md` §5). The `state`, `error_class` and `event_type` enums, contrary to §5's wording, **are**
+// expressible — Prisma has native enum blocks and generates `CREATE TYPE` — so they are declared here
+// rather than hand-added.
 //
 // Two modelling rules applied throughout, both to avoid inventing behaviour the design never
 // declared:
