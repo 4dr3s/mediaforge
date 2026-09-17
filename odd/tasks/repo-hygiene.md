@@ -237,7 +237,89 @@ awk '/^```/{f=!f;next} f' <file> | md5sum
 
 ## Evidence log
 
-Empty until 1.1 runs.
+Raw output, appended as each task closes. Verbatim, not paraphrased.
+
+### 1.1 — Baseline (2026-09-17)
+
+The first attempt was red and it was an environment fact, not a regression. `docker compose`
+failed with `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine;
+check if the path is correct and see if the daemon is running`, and both suites failed with
+connection refused to Postgres and Redis. Docker Desktop was started (server 29.6.2) and the run
+below is the second attempt:
+
+```text
+$ docker compose -f docker/compose.yaml up -d --wait
+ mediaforge-redis Healthy · mediaforge-postgres Healthy · mediaforge-api Healthy · mediaforge-worker Healthy
+[exit=0]
+$ pnpm test:api
+ Test Files  1 passed (1) · Tests  2 passed (2)
+[exit=0]
+$ pnpm test:worker
+ 2 passed in 0.24s
+[exit=0]
+```
+
+### 1.2 — `.gitattributes` (2026-09-17)
+
+The interesting part: a first byte scan reported all 54 files as containing CR, and that number
+was garbage. `xargs` splits arguments on whitespace, and a carriage return *is* whitespace, so the
+pattern arrived at `grep` empty and matched every line of every file. The re-run uses a
+two-character PCRE pattern (`\r`) so no raw control byte travels through `argv`. Measured
+conclusion: nothing on disk had CRLF; the danger was latent in the next clone or checkout, which
+`eol=lf` removes.
+
+```text
+$ git ls-files --eol | awk '{print $1, $2}' | sort | uniq -c
+     54 i/lf w/lf
+$ git ls-files -z | xargs -0 grep -lUP '\r'      # correct scan
+(no output)  -> 0 of 54 tracked files contain a carriage return
+$ awk 'BEGIN{n=0} /\r/{n++} END{...}' Makefile .gitattributes package.json docker/compose.yaml
+ 0 CR lines each
+$ git add --renormalize .
+(staged nothing beyond .gitattributes)
+$ git check-attr text eol -- package.json
+package.json: text: auto
+package.json: eol: lf
+```
+
+### 1.3 — the runner gate
+
+The A/B block is already in the task body above; measured 2026-09-17, so nothing new to record
+here.
+
+### 1.4 — the pnpm pin (2026-09-17)
+
+```text
+$ pnpm install
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+Done in 581ms using pnpm v10.33.0
+[exit=0]   (no "Ignored build scripts" notice)
+$ wc -c pnpm-lock.yaml   -> 120856 before and 120856 after
+$ pnpm test:api -> Test Files 1 passed (1) · Tests 2 passed (2)  [exit=0]
+$ pnpm test:worker -> 2 passed in 0.23s                          [exit=0]
+```
+
+### 1.5 — the entrypoints (2026-09-17)
+
+```text
+$ command -v make
+(no output) [exit=1]
+$ make --version
+make: command not found [exit=127]
+```
+
+### 1.7 — the closure (2026-09-17)
+
+What this task changed: the S1 residue list now marks every item resolved, inert or binding; the
+two false statements in its Git history section were corrected; and both `.es.md` copies were
+regenerated and verified byte-identical on their code blocks.
+
+**Commit ids for the evidence log:** `746be7f` feature tracking · `914b65d` SDD plan
+reconciliation · `758df00` Makefile entrypoints · `b8f1c7d` pnpm build scripts · `42a189b` lint
+re-measurement and D1 control · `23585e5` LF line endings. The five commits that preceded this
+feature are `b05afcd`, `892f706`, `9d05ebd`, `ab47532`, `9eb288b`.
 
 ## Out of scope
 

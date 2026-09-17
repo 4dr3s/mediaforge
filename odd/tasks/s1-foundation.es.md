@@ -127,8 +127,9 @@ URLs `_TEST` en tu shell, o los tests siguen mirando los puertos viejos.
 
 ## Historial de git
 
-Cuatro commits en `main`, creados el 2026-09-16, cada uno una unidad revisable en vez de una
-importación en bloque:
+Cinco commits en `main`, cada uno una unidad revisable en vez de una importación en bloque. Los
+primeros cuatro se crearon el 2026-09-16; el quinto (`9eb288b`) es el commit que escribió esta
+sección:
 
 | Commit | Asunto | Tamaño |
 | --- | --- | --- |
@@ -136,49 +137,75 @@ importación en bloque:
 | `892f706` | `docs(odd): track the S1 foundation rebuild as an ODD feature` | 2 archivos, 1176 inserciones |
 | `9d05ebd` | `feat(scaffold): pnpm workspace, NestJS api, uv worker project and dependency harness` | 20 archivos, 4363 inserciones |
 | `ab47532` | `feat(docker): local stack with PostgreSQL 18, Redis 7 and both service images` | 6 archivos, 331 inserciones |
+| `9eb288b` | `docs(odd): record the git history and the line-ending finding` | 2 archivos, 56 inserciones |
+
+La quinta fila es de lo que trataba el hallazgo F2 en `repo-hygiene.md`: esta sección solía
+decir *"Four commits on `main`"* y omitía el commit que la escribió.
 
 El remoto `origin` es `https://github.com/4dr3s/mediaforge.git`, verificado público y **vacío**
-antes del primer commit (`git ls-remote` no devolvió refs), así que no hizo falta merge. **Todavía
-no se pusheó nada.**
+antes del primer commit (`git ls-remote` no devolvió refs), así que no hizo falta merge.
+**Pusheado el 2026-09-17:** `main` fue a `origin` llevando los cinco commits, hasta `9eb288b`.
+Los seis commits de la feature `repo-hygiene` — `746be7f` feature tracking · `914b65d` SDD plan
+reconciliation · `758df00` Makefile entrypoints · `b8f1c7d` pnpm build scripts · `42a189b` lint
+re-measurement y D1 control · `23585e5` LF line endings — son locales, no pusheados.
 
-## Inconsistencias conocidas que quedan (decisiones abiertas)
+## Inconsistencias conocidas que quedan (cerradas)
 
-- `openspec/changes/audio-extract-vertical-slice/tasks.md` sigue diciendo `7/74 complete`
-  (1.1–1.4, 5.1, 5.2, 13.2). Esos checkboxes acreditan hoy artefactos que ya no existen.
-- El registro de runtime del SDD `.git/gentle-ai/sdd-runtime/v1/audio-extract-vertical-slice/`
-  tiene un `attempt/begin` de S1 sin `end`; `gentle-ai sdd-status` sigue reportando `next: apply`.
-- **Fin de línea (encontrado al commitear, 2026-09-16).** Cada `git add` avisó *"LF will be
-  replaced by CRLF the next time Git touches it"* — `core.autocrlf=true` en esta máquina. El
-  contenido se guarda con LF y la copia de trabajo recibe CRLF. Inofensivo para Markdown, JSON,
-  TypeScript y Python; **no** inofensivo para un script de shell o un entrypoint que se copia
-  dentro de un contenedor Linux, que falla de maneras que parecen cualquier cosa menos fin de
-  línea. El scaffold borrado tenía exactamente un script así
-  (`workers/media/spikes/sandbox_namespace_precheck.sh`), así que esto va a volver. Recomendación:
-  un `.gitattributes` que fuerce LF donde el consumidor es el contenedor. Decisión del supervisor.
-- **Historial y remoto de git (2026-09-16).** Cuatro commits en `main`; `origin` apuntando a
-  `https://github.com/4dr3s/mediaforge.git`, verificado público y vacío. Nada pusheado.
-- **El repositorio no tenía ningún commit hasta esta sesión**, así que no hay baseline contra la
-  cual diffear la reconstrucción. El tarball de seguridad sigue siendo la única copia del output
-  de S1 borrado.
-- **`make` no está instalado en esta máquina** (`/usr/bin/bash: make: command not found`, exit
-  `127`). El `Makefile` se conserva para Linux y CI, donde es el entrypoint canónico, y los scripts
-  de `package.json` (`pnpm test:api`, `pnpm test:worker`) son el camino portable que funciona acá.
-  Decisión del supervisor: mantener los dos, o dejar el `Makefile` para cuando exista CI.
-- **`tasks.md` §"Runners and canonical commands" prescribe el comando de D1**
-  (`pnpm --filter api exec vitest run <file>`). Ese artefacto sigue indicando un gate roto; el
-  reemplazo está verificado pero todavía no se escribió de vuelta en el plan SDD.
-- `pnpm install` reporta dos build scripts ignorados (`@nestjs/core`, `esbuild`). Inofensivo hoy;
-  fijar el conjunto permitido (`pnpm.onlyBuiltDependencies`) antes de que CI dependa de eso.
-- pi-lens marca `health.controller.ts` con `ast-grep:large-class` (una clase de 7 líneas con un
-  método) y `knip` marcó todas las dependencias de NestJS como no usadas mientras `src/` no
-  existía. Revisados los dos: los hallazgos de `knip` desaparecieron cuando aterrizó el código.
-  No se accionó ninguno.
-- **O2 es vinculante para WU-2** (ver el registro de revisión): las aserciones de base del harness
-  se mudan al cliente Prisma, y `pg` / `@types/pg` salen de `package.json` en esa misma tarea.
-- La resolución de **`.env.example`** está registrada arriba (dropeado; las variables quedan
-  documentadas acá y en `docker/compose.yaml`).
+Cada item de abajo se re-midió el 2026-09-17 dentro de la feature que le sigue,
+[`repo-hygiene`](repo-hygiene.md), y ahora termina en exactamente uno de tres estados:
+**resolved** (resuelto), **inert** (inerte, con la razón), o **binding on a future feature**
+(vinculante a una feature futura, cuál, dicha abajo). Ningún item queda ambiguo.
 
-Ninguna de estas bloquea la tarea 1.4, que está completa.
+- **La acreditación del `tasks.md` del SDD** — **resolved** por el commit `914b65d`. Los 7
+  checkboxes viejos (1.1–1.4, 5.1, 5.2, 13.2) volvieron a `[ ]` (0/74), con una nota que dice que
+  su evidencia se borró con el output de apply de S1 y que el trabajo se reconstruyó bajo ODD en
+  esta feature.
+- **El `tasks.md` §"Runners and canonical commands" prescribe el comando de D1** — **resolved**
+  por el mismo commit `914b65d`: el reemplazo verificado quedó escrito de vuelta en el plan SDD, y
+  las dos líneas de runners llevan `--fail-if-no-match`. La afirmación de que el reemplazo "has
+  not been written back into the SDD plan" ya no es verdad.
+- **El registro de runtime del SDD** — **inert**. `gentle-ai sdd-attempt --help` reporta *"Runtime
+  attempt operations are retired"*: ninguna operación soportada puede cerrar o abortar el
+  `attempt/begin`, así que "cerrar el attempt" nunca fue un fix disponible, y borrar el registro a
+  mano sería manipular un audit store. `next: apply` viene de las 67 tareas destildadas del plan,
+  no del registro, y es la respuesta correcta para un plan cuya ejecución se mudó a ODD.
+- **Fin de línea (encontrado al commitear, 2026-09-16)** — **resolved** por el commit `23585e5`.
+  La nota original afirmaba un mecanismo no medido: el contenido se guarda con LF *"y la copia de
+  trabajo recibe CRLF"*. Medido el 2026-09-17, la copia de trabajo ya era LF — 54 de 54 archivos
+  trackeados, sin un byte CR en ningún lado (`git ls-files --eol` reporta `i/lf w/lf` para cada
+  archivo). La conversión era un riesgo **latente** que se habría materializado en el próximo
+  clone o checkout; el modo de falla que preocupaba a la nota (un script de shell o entrypoint
+  copiado dentro de un contenedor Linux) es real, y el `.gitattributes` (`* text=auto eol=lf`)
+  elimina el riesgo.
+- **Historial y remoto de git** — **resolved** (hallazgo F2 en `repo-hygiene.md`): las dos
+  afirmaciones falsas quedaron corregidas en la sección *Historial de git* de más arriba.
+- **Sin baseline contra el cual diffear la reconstrucción** — **resolved** por resolución. El
+  árbol reconstruido está ahora commiteado **y pusheado** (2026-09-17), así que el tarball de
+  seguridad dejó de ser la única copia del output de S1 borrado.
+- **`make` no está instalado en esta máquina** — **resolved** por decisión más el commit
+  `758df00`. Los dos entrypoints quedan: el `Makefile` sigue siendo el entrypoint de Linux/CI y
+  los scripts del `package.json` de la raíz (`pnpm test:api`, `pnpm test:worker`) siguen siendo el
+  camino portable; la regla quedó documentada en el comentario del encabezado del `Makefile`.
+- **`pnpm install` ignora dos build scripts** (`@nestjs/core`, `esbuild`) — **resolved** por el
+  commit `b8f1c7d`: el conjunto permitido quedó fijado (`pnpm.onlyBuiltDependencies`) y `pnpm
+  install` ya no reporta el aviso de scripts ignorados.
+- **pi-lens / knip** — **resolved con veredictos** (hallazgos F4/F5 en `repo-hygiene.md`), sin
+  accionar. La afirmación de `knip` sobre `apps/api` no se reproduce sobre el árbol actual
+  (`pnpm dlx knip --workspace api` sale con `0` sin salida). El advisory `large-class` se
+  reproduce pero es un defecto de la regla — la regla publicada no lleva condición de cantidad de
+  métodos mientras su mensaje afirma "more than 20 methods" — no de `health.controller.ts`. La
+  corrida full-workspace de knip expuso un hallazgo vivo que la lista nunca tuvo: `uv` como
+  binario no listado para `test:worker` (una herramienta a nivel de máquina que el script de la
+  raíz invoca). Está registrado y diferido: solo se vuelve vinculante si knip se adopta como
+  dependencia del proyecto (`repo-hygiene.md`, *Fuera de alcance*).
+- **O2 (aserciones de base del harness)** — **binding on WU-2**, no de esta feature. Cuando
+  aterrice WU-2, `test/harness.spec.ts` mueve sus aserciones de base al cliente Prisma, y `pg` +
+  `@types/pg` salen de `package.json` en esa misma tarea; ver el registro de revisión del
+  supervisor.
+- **`.env.example`** — **resolved**; la resolución está registrada en la sección *Variables de
+  entorno* de más arriba. Dropeado por decisión del supervisor el 2026-09-16 (la política de rutas
+  rechazó el nombre de archivo; cada variable tiene un default, documentado acá y en
+  `docker/compose.yaml`).
 
 ---
 

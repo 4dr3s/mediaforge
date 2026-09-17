@@ -121,7 +121,8 @@ in your shell too, or the tests keep looking at the old ports.
 
 ## Git history
 
-Four commits on `main`, created 2026-09-16, each a reviewable unit rather than one bulk import:
+Five commits on `main`, each a reviewable unit rather than one bulk import. The first four were
+created 2026-09-16; the fifth (`9eb288b`) is the commit that wrote this section:
 
 | Commit | Subject | Size |
 | --- | --- | --- |
@@ -129,49 +130,71 @@ Four commits on `main`, created 2026-09-16, each a reviewable unit rather than o
 | `892f706` | `docs(odd): track the S1 foundation rebuild as an ODD feature` | 2 files, 1176 insertions |
 | `9d05ebd` | `feat(scaffold): pnpm workspace, NestJS api, uv worker project and dependency harness` | 20 files, 4363 insertions |
 | `ab47532` | `feat(docker): local stack with PostgreSQL 18, Redis 7 and both service images` | 6 files, 331 insertions |
+| `9eb288b` | `docs(odd): record the git history and the line-ending finding` | 2 files, 56 insertions |
+
+The fifth row is what finding F2 in `repo-hygiene.md` was about: this section used to say *"Four
+commits on `main`"* and omitted the commit that wrote it.
 
 Remote `origin` is `https://github.com/4dr3s/mediaforge.git`, verified public and **empty** before
-the first commit (`git ls-remote` returned no refs), so no merge was needed. **Nothing has been
-pushed yet.**
+the first commit (`git ls-remote` returned no refs), so no merge was needed. **Pushed on
+2026-09-17:** `main` went to `origin` carrying all five commits, through `9eb288b`. The six
+commits of the `repo-hygiene` feature — `746be7f` feature tracking · `914b65d` SDD plan
+reconciliation · `758df00` Makefile entrypoints · `b8f1c7d` pnpm build scripts · `42a189b` lint
+re-measurement and D1 control · `23585e5` LF line endings — are local, not pushed.
 
-## Known inconsistencies left behind (open decisions)
+## Known inconsistencies left behind (closed)
 
-- `openspec/changes/audio-extract-vertical-slice/tasks.md` still shows `7/74 complete`
-  (1.1–1.4, 5.1, 5.2, 13.2). Those checkboxes now attest artifacts that no longer exist.
-- The SDD runtime record `.git/gentle-ai/sdd-runtime/v1/audio-extract-vertical-slice/` holds an
-  `attempt/begin` for S1 with no matching `end`; `gentle-ai sdd-status` still reports
-  `next: apply`.
-- **Line endings (found while committing, 2026-09-16).** Every `git add` warned *"LF will be
-  replaced by CRLF the next time Git touches it"* — `core.autocrlf=true` on this machine. Content
-  is stored with LF and the working copy gets CRLF. Harmless for Markdown, JSON, TypeScript and
-  Python; **not** harmless for a shell script or an entrypoint copied into a Linux container,
-  which fails in ways that look like anything except line endings. The deleted scaffold had
-  exactly such a script (`workers/media/spikes/sandbox_namespace_precheck.sh`), so this will come
-  back. Recommendation: a `.gitattributes` forcing LF where the container is the consumer.
-  Supervisor's call.
-- **Git history and remote (2026-09-16).** Four commits on `main`; `origin` set to
-  `https://github.com/4dr3s/mediaforge.git`, verified public and empty. Nothing pushed.
-- **The repository had no commits until this session**, so there is no baseline to diff the
-  rebuild against. The safety-net tarball remains the only copy of the deleted S1 output.
-- **`make` is not installed on this machine** (`/usr/bin/bash: make: command not found`,
-  exit `127`). The `Makefile` is kept for Linux and CI, where it is the canonical entrypoint, and
-  the root `package.json` scripts (`pnpm test:api`, `pnpm test:worker`) are the portable path that
-  works here. Supervisor's call: keep both, or drop the `Makefile` until CI exists.
-- **`tasks.md` §"Runners and canonical commands" prescribes the D1 command**
-  (`pnpm --filter api exec vitest run <file>`). That artifact still instructs a broken gate; the
-  replacement is verified but has not been written back into the SDD plan.
-- `pnpm install` reports two ignored build scripts (`@nestjs/core`, `esbuild`). Harmless today;
-  pin the allowed set (`pnpm.onlyBuiltDependencies`) before CI depends on it.
-- pi-lens flags `health.controller.ts` with `ast-grep:large-class` (a 7-line class with one
-  method) and `knip` flagged every NestJS dependency as unused while `src/` did not exist yet.
-  Both were re-checked: the `knip` findings disappeared once the source landed. Not actioned.
+Every item below was re-measured on 2026-09-17 by the follow-up feature
+[`repo-hygiene`](repo-hygiene.md) and now ends in exactly one of three states: **resolved**,
+**inert** (with the reason), or **binding on a future feature** (named below). No item stays
+ambiguous.
 
-None of these block task 1.4, which is complete. Two more, and then 1.3 is closed:
-
-- **O2 is binding on WU-2** (see the supervisor review log): the harness database assertions move
-  to the Prisma client, and `pg` / `@types/pg` leave `package.json` in the same task.
-- **`.env.example` resolution is recorded above** (dropped; variables documented here and in
-  `docker/compose.yaml`).
+- **SDD `tasks.md` attestation** — **resolved** by commit `914b65d`. The 7 stale checkboxes
+  (1.1–1.4, 5.1, 5.2, 13.2) are back to `[ ]` (0/74), with a note stating that their evidence was
+  deleted with the S1 apply output and that the work was rebuilt under ODD in this feature.
+- **`tasks.md` "Runners and canonical commands" prescribes the D1 command** — **resolved** by the
+  same commit `914b65d`: the verified replacement is written back into the SDD plan, and both
+  runner lines carry `--fail-if-no-match`. The claim that the replacement "has not been written
+  back into the SDD plan" is no longer true.
+- **The SDD runtime record** — **inert**. `gentle-ai sdd-attempt --help` reports *"Runtime attempt
+  operations are retired"*: no supported operation can end or abort the `attempt/begin`, so
+  "close the attempt" was never an available fix, and deleting the record by hand would be
+  tampering with an audit store. `next: apply` comes from the plan's 67 unchecked tasks, not from
+  the record, and is the correct answer for a plan whose execution moved to ODD.
+- **Line endings (found while committing, 2026-09-16)** — **resolved** by commit `23585e5`. The
+  original note asserted an unmeasured mechanism: content is stored with LF *"and the working
+  copy gets CRLF"*. Measured 2026-09-17, the working copy was already LF — 54 of 54 tracked
+  files, no CR byte anywhere (`git ls-files --eol` reports `i/lf w/lf` for every file). The
+  conversion was a **latent** risk that would have materialized on the next clone or checkout; the
+  failure mode the note worried about (a shell script or entrypoint copied into a Linux container)
+  is real, and `.gitattributes` (`* text=auto eol=lf`) removes the risk.
+- **Git history and remote** — **resolved** (finding F2 in `repo-hygiene.md`): the two false
+  statements are corrected in the *Git history* section above.
+- **No baseline to diff the rebuild against** — **resolved** by resolution. The rebuilt tree is
+  now committed **and pushed** (2026-09-17), so the safety-net tarball stopped being the only
+  copy of the deleted S1 output.
+- **`make` is not installed on this machine** — **resolved** by decision plus commit `758df00`.
+  Both entrypoints stay: the `Makefile` remains the Linux/CI entrypoint and the root
+  `package.json` scripts (`pnpm test:api`, `pnpm test:worker`) remain the portable path; the rule
+  is documented in a comment header in the `Makefile` itself.
+- **`pnpm install` ignores two build scripts** (`@nestjs/core`, `esbuild`) — **resolved** by
+  commit `b8f1c7d`: the allowed set is pinned (`pnpm.onlyBuiltDependencies`) and `pnpm install`
+  no longer reports the ignored-scripts notice.
+- **pi-lens / knip** — **resolved with verdicts** (findings F4/F5 in `repo-hygiene.md`), not
+  actioned. `knip`'s claim about `apps/api` does not reproduce on the current tree
+  (`pnpm dlx knip --workspace api` exits `0` with no output). The `large-class` advisory
+  reproduces but is a defect in the rule — the shipped rule carries no method-count condition
+  while its message claims "more than 20 methods" — not in `health.controller.ts`. The
+  full-workspace knip run surfaced a live finding the list never had: `uv` as an unlisted binary
+  for `test:worker` (a machine-level tool the root script invokes). It is recorded and deferred:
+  it only becomes binding if knip is adopted as a project dependency (`repo-hygiene.md`, *Out of
+  scope*).
+- **O2 (harness database assertions)** — **binding on WU-2**, not on this feature. When WU-2
+  lands, `test/harness.spec.ts` moves its database assertions to the Prisma client, and `pg` +
+  `@types/pg` leave `package.json` in the same task; see the supervisor review log.
+- **`.env.example`** — **resolved**; the resolution is recorded in the *Environment variables*
+  section above. Dropped by supervisor decision on 2026-09-16 (the path policy refused the
+  filename; every variable has a default, documented here and in `docker/compose.yaml`).
 
 ---
 
