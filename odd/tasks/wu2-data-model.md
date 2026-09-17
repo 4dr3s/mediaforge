@@ -227,9 +227,16 @@ Raw output, appended as each task closes. Verbatim, not paraphrased.
 **Prisma 7, adopted by supervisor decision, and what that changed.** The design and the plan assumed
 the classic model. Prisma 7 removed `datasource.url` from the schema, requires `prisma7.config.ts`
 for the connection string, replaces the generator with `prisma-client` (explicit `output`) and needs a
-driver adapter for a direct connection. The adapter depends on `pg`, so O2's letter still holds —
-`pg` never enters this manifest — while the underlying driver is now `pg` under Prisma's adapter.
-Recorded because it is a real change to the design's assumptions, not a dependency bump.
+driver adapter for a direct connection. The adapter depends on `pg`. Recorded because it is a real
+change to the design's assumptions, not a dependency bump.
+
+> **Correction (2026-09-17, same day).** This section originally claimed that "O2's letter still
+> holds — `pg` never enters this manifest". **That was false in both directions and the independent
+> verifier refuted it.** `pg` and `@types/pg` were already direct devDependencies of `apps/api` from
+> the S1 scaffold, and they are still there; and `test/harness.spec.ts` still imports `Client` from
+> `pg`. O2 was never satisfied by this work unit — it is **task 1.4**, and it is still open. The claim
+> was written from reasoning about the adapter instead of from reading the manifest, which is exactly
+> the failure this project keeps finding in other people's documents.
 
 **A version trap, measured.** `npm view prisma dist-tags` reports `latest: 8.0.0-rc.15` — a release
 candidate under the `latest` tag — and `prev: 7.10.0`. `npx prisma` (which the schema linter reaches
@@ -322,6 +329,38 @@ A first attempt at that inspection reported "prisma not found" and "no dist"; bo
 the paths assumed a flat layout. In a pnpm workspace the binaries live under `apps/api/node_modules`,
 and `dist` under `apps/api/dist`. The image was fine; the check was not. Listed here because the
 correction is the point: `docker run` is only evidence if the path is right.
+
+### 1.3 — independent verification, and what it refuted (2026-09-17)
+
+Seven claims held: the live database matches the ERD §3/§4 with **zero divergence in either
+direction** (49 domain columns, types, nullability, the six-label enum in declared order, four
+composite uniques, the `uuidv7()` defaults and the `artifacts.id` exception, six foreign keys, three
+CHECKs, the partial index, and the index trace); both roles match §3's privilege table in both
+directions and neither owns a table; no drift, reproduced; both gates green **and** covering the
+suites; the defaults decision sound within its scope (verified against both canonical statements, and
+the answer to "is there any other NOT NULL column a canonical statement omits?" is no); nothing
+smuggled in.
+
+**One claim was refuted, and it was this unit's own: O2 is not satisfied.** See the correction above.
+The verifier also noted that the transitive part is real — `@prisma/adapter-pg@7.10.0` depends on `pg`
+and `@types/pg` — but the honest statement is that `pg` is **both** a direct devDependency and a
+transitive one, not "transitive only".
+
+**The suite can still be fooled, in three constructible ways.** The verifier read all eighteen
+assertions and built wrong databases that pass every one:
+
+1. **The sharpest:** replacing the `error_class` CHECK with one that forbids NULL
+   (`CHECK (error_class IS NOT NULL AND error_class IN (...))`) passes, because the suite compares the
+   union of quoted literals. But the ERD declares `error_class` nullable and §6's canonical T6 does
+   `UPDATE attempts SET ... error_class = NULL`, which that constraint would reject.
+2. `CHECK (ordinal >= 1 AND ordinal <= 1)` matches the suite's regex — the file's own header admits
+   the regex is a spelling check, not a semantic proof — and the single behavioral test only inserts
+   ordinal 1.
+3. **No assertion reads `column_default` for the three §6 defaults**, so a database that dropped them
+   passes all eighteen and then fails the design's own canonical inserts at runtime.
+
+All three are closed in task 1.4's follow-up commit. The lesson is the same one this feature keeps
+producing from different angles: a catalog assertion proves what it reads, and nothing more.
 
 ### 1.1 — RED: the schema contract suite (2026-09-17)
 
