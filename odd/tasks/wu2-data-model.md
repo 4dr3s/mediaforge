@@ -222,6 +222,107 @@ findings are recorded with what was done about each one.
 
 Raw output, appended as each task closes. Verbatim, not paraphrased.
 
+### 1.3 — GREEN: schema, migration, roles (2026-09-17)
+
+**Prisma 7, adopted by supervisor decision, and what that changed.** The design and the plan assumed
+the classic model. Prisma 7 removed `datasource.url` from the schema, requires `prisma7.config.ts`
+for the connection string, replaces the generator with `prisma-client` (explicit `output`) and needs a
+driver adapter for a direct connection. The adapter depends on `pg`, so O2's letter still holds —
+`pg` never enters this manifest — while the underlying driver is now `pg` under Prisma's adapter.
+Recorded because it is a real change to the design's assumptions, not a dependency bump.
+
+**A version trap, measured.** `npm view prisma dist-tags` reports `latest: 8.0.0-rc.15` — a release
+candidate under the `latest` tag — and `prev: 7.10.0`. `npx prisma` (which the schema linter reaches
+for) resolves that RC. This project pins `7.10.0` in the manifest.
+
+**The plan's 2.4 acceptance command no longer exists in v7.** `--from-schema-datasource` and
+`--to-schema-datamodel` were replaced by `--from-config-datasource` and `--to-schema`, and
+`--exit-code` turns "no drift" into exit `0` (empty: 0, error: 1, not empty: 2). The replacement was
+measured rather than assumed:
+
+```text
+$ pnpm --filter api exec prisma migrate diff --from-config-datasource \
+    --to-schema=prisma/schema.prisma --exit-code
+Loaded Prisma config from prisma7.config.ts.
+No difference detected.
+[exit=0]
+```
+
+**The ERD and the design's own canonical SQL disagreed about defaults.** Found while reviewing the
+migration, not by reading prose. Two statements in §6 insert rows without every NOT NULL column:
+
+| Line | Canonical SQL | Columns it omits |
+| --- | --- | --- |
+| `design.md:355` | `INSERT INTO outbox (job_id, event_type, payload)` | `attempts`, `created_at` |
+| `design.md:379` | `INSERT INTO attempts (job_id, attempt_no, lease_owner, lease_expires_at, started_at)` | `created_at` |
+
+Resolved in favour of the canonical SQL: those three columns carry defaults, and **no other column
+does**. C1's create transaction (jobs, job_inputs, submissions) has no canonical SQL in the design, so
+it gets no defaults — a forgotten value there fails loudly instead of being papered over. Recorded as
+a decision in the schema header, not left as an unexplained inconsistency.
+
+**Migration and hand-edits.** Generated with `migrate dev --create-only --name init`, then edited:
+the `state` enum is **not** among the hand-edits (Prisma generated `CREATE TYPE` itself, refuting §5's
+wording and this file's earlier header), while the three CHECK constraints, the partial outbox index
+and the roles/grants are appended to the same file, which stays the single DDL authority.
+
+```text
+$ pnpm --filter api exec prisma migrate deploy
+1 migration found in prisma/migrations
+Applying migration `20260917183632_init`
+All migrations have been successfully applied.
+[exit=0]
+```
+
+`CREATE ROLE` inside Prisma's migration transaction works — measured here, because it was an open
+question and "it should work" is not evidence.
+
+**Both suites green, through the canonical commands:**
+
+```text
+$ pnpm test:api      -> Test Files 2 passed (2) · Tests 20 passed (20)   [exit=0]
+$ pnpm test:worker   -> 14 passed in 0.70s                              [exit=0]
+```
+
+**Three failures that only GREEN could reveal — all of them test bugs, not schema bugs.** In RED every
+assertion failed for absence, so nothing exercised whether the assertions could *express* a pass:
+
+1. `array_agg` returns a **string** (`'{job_id,ordinal}'`) through node-postgres, which does not parse
+   `text[]`; the comparisons against real arrays could never pass. Fixed with `json_agg`, which the
+   driver does parse. This is the same class as the `pg_constraint` issue the verifier predicted, and
+   it is the reason a suite that is red for absence cannot validate its own assertions.
+2. The "exactly six tables" assertion counted `_prisma_migrations`, Prisma's own ledger. Excluded.
+3. A unique-column-set expectation written in declaration order failed against the correctly sorted
+   set; the schema was right and the assertion was wrong. Now compared with an explicit `setOf`, so
+   the order-insensitivity is in the code instead of in a helper's `ORDER BY`.
+
+**A gate that did not cover its own suites.** `test:api` ran only `test:harness`, and `test:worker`
+only `tests/test_harness.py`, so the schema and privilege suites were outside the canonical commands:
+they could pass or fail without `pnpm test:api` ever running them. Both scripts (and the `Makefile`
+targets) now run the whole suite for their runtime. Same family as defect D1 — a gate that cannot fail
+is not a gate, and a gate that does not run the test is not covering it.
+
+**The image was rebuilt and inspected, not assumed.** The lockfile changed, so a green `build` would
+have proven nothing about the image (defects D2/D3):
+
+```text
+$ docker compose -f docker/compose.yaml build api   [exit=0]
+$ docker compose -f docker/compose.yaml up -d --wait [exit=0]
+mediaforge-api Up (healthy) · mediaforge-postgres Up (healthy)
+mediaforge-redis Up (healthy) · mediaforge-worker Up
+
+$ docker run --rm --entrypoint sh mediaforge-api:latest -c "..."
+/app: apps, node_modules, package.json, pnpm-lock.yaml, pnpm-workspace.yaml
+apps/api/dist: app.module.js, health.controller.js, main.js (+ .d.ts, .map)   <- no partial emit
+apps/api/prisma/migrations: 20260917183632_init, migration_lock.toml          <- present in the image
+apps/api/node_modules/.bin/prisma --version: prisma 7.10.0 / @prisma/client 7.10.0 / linux
+```
+
+A first attempt at that inspection reported "prisma not found" and "no dist"; both were wrong because
+the paths assumed a flat layout. In a pnpm workspace the binaries live under `apps/api/node_modules`,
+and `dist` under `apps/api/dist`. The image was fine; the check was not. Listed here because the
+correction is the point: `docker run` is only evidence if the path is right.
+
 ### 1.1 — RED: the schema contract suite (2026-09-17)
 
 ```text
