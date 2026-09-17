@@ -8,6 +8,7 @@ description = "MediaForge media processing worker"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "asyncpg>=0.29.0",
+    "pydantic>=2.13.5",
     "redis>=5.0.0",
 ]
 
@@ -33,3 +34,11 @@ venvPath = "."
 venv = ".venv"
 pythonVersion = "3.11"
 include = ["src", "tests"]
+
+# `mediaforge` is this project's own package (it lives under `src/`), so it belongs in the
+# first-party import group, separated from third-party imports like `pytest` and `redis`.
+# Declared here because the tooling cannot infer it: without this, an import sorter assumes
+# `mediaforge` is third-party and asks for the groups to be merged, which would be wrong for every
+# file in the worker.
+[tool.ruff.lint.isort]
+known-first-party = ["mediaforge"]

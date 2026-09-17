@@ -124,7 +124,86 @@ verified (code blocks byte-identical); the feature is closed with its gates reco
 
 ## Evidence log
 
-Empty until 1.1 runs.
+Raw output, appended as each task closes. Verbatim, not paraphrased.
+
+### 1.1 — RED: the two parity suites (2026-09-17)
+
+```text
+$ pnpm --filter api exec vitest run test/contract.parity.spec.ts
+Error: Failed to load url ../src/contracts/job-params (resolved id: ../src/contracts/job-params)
+       in .../apps/api/test/contract.parity.spec.ts. Does the file exist?
+ Test Files  1 failed (1)
+      Tests  no tests
+[exit=1]
+
+$ uv run --project workers/media pytest workers/media/tests/test_contract_parity.py -q
+E   ModuleNotFoundError: No module named 'mediaforge.contracts'
+!!!!!!!!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 error in 0.15s
+[exit=2]
+```
+
+Both are **absence** failures: the TypeScript suite names the module that does not exist yet, and the
+Python one fails at import for the same reason. Neither failed on a malformed test file, which is the
+distinction that makes this a RED run rather than noise — and the Python file was additionally proved
+syntactically valid with `python -m py_compile`, so the failure cannot be a syntax error in disguise.
+
+**A gap found in the suites themselves, and closed.** An independent reading of the two files against
+their own requirements showed that **neither asserted the registry's input-type allowlist**, which C1
+requires and `design.md` §2.2 lists alongside the caps. Implementing 1.2 without noticing would have
+shipped a contract with no allowlist and a gate that could not have caught its absence. The assertion
+was added to both sides, deliberately loose: non-empty, every entry a string, and the slice's
+canonical `video/mp4` present — **not** the exact list, because the point of a data registry is that
+adding a container is a registry change, and a test that pinned the list would turn a data change into
+a test change.
+
+### 1.2 — GREEN: the contract, the registry and both validators (2026-09-17)
+
+The registry, which is **data**:
+
+```json
+{
+  "audio.extract": {
+    "input_arity": 1,
+    "input_size_cap_bytes": 209715200,
+    "allowed_input_types": ["video/mp4"],
+    "output_size_cap_bytes": 262144000,
+    "wall_clock_limit_s": 600,
+    "lease_ttl_s": 300,
+    "lease_grace_s": 60,
+    "attempt_budget": 3,
+    "params": {
+      "properties": {
+        "quality": { "type": "string", "enum": ["128k", "192k", "320k"] }
+      }
+    }
+  }
+}
+```
+
+The two gates, with the parity suites inside them:
+
+```text
+$ pnpm test:api     -> Test Files 3 passed (3) · Tests 42 passed (42)   [exit=0]
+                       (contract.parity 18 + harness 2 + schema 22)
+$ pnpm test:worker  -> 33 passed in 0.82s                              [exit=0]
+                       (contract parity 19 + privileges 12 + harness 2)
+```
+
+**The gate caught a real leak, which is the best evidence that it works.** The first version of the
+envelope schema described one of its fields with the word *"consumer"* — adapter vocabulary that C3
+forbids in the domain contract, sitting inside a JSON string value where a reader would never notice
+it. The vocabulary scan failed the build. It was removed from the description, not from the scan.
+
+**Two blockers, and they were different kinds.** pi-lens reported an unresolved import of
+`mediaforge.contracts` and an un-sorted import block. The first was a **stale cache**: the finding was
+captured before the module existed, and the proof is that the module imports and the suite that imports
+it runs nineteen tests green. The second was **real, and not where I first looked**: it was not the
+grouping — which is correct, `mediaforge` is first-party — but the formatting: a three-line import that
+fits on one line (84 characters against a limit of 88). Collapsing it cleared the finding. Two things
+were done before that, and both stay: the project now **declares** `known-first-party = ["mediaforge"]`
+in `pyproject.toml` instead of leaving the convention implicit, and nothing was deformed to please a
+tool.
 
 ## Out of scope
 
