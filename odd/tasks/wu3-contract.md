@@ -157,6 +157,7 @@ canonical `video/mp4` present — **not** the exact list, because the point of a
 adding a container is a registry change, and a test that pinned the list would turn a data change into
 a test change.
 
+
 ### 1.2 — GREEN: the contract, the registry and both validators (2026-09-17)
 
 The registry, which is **data**:
@@ -204,6 +205,61 @@ fits on one line (84 characters against a limit of 88). Collapsing it cleared th
 were done before that, and both stay: the project now **declares** `known-first-party = ["mediaforge"]`
 in `pyproject.toml` instead of leaving the convention implicit, and nothing was deformed to please a
 tool.
+
+
+### 1.3 — independent verification, and what it refuted (2026-09-17)
+
+The RDD gate ran an adversarial verifier with one instruction that mattered: construct a wrong contract
+that passes every assertion. It found one, and then found something the mutations could not have
+reached.
+
+**Refuted, most severe first:**
+
+1. **The schema file is unenforced decoration.** Mutating `dispatch-envelope.schema.json` — allowing a
+   fourth property, changing the version `const` to `...v2`, changing `format: date-time` to `date` —
+   passes **both suites untouched**. No suite reads the schema's *semantics*; it is scanned for
+   vocabulary tokens and nothing else. The file C3 calls the contract is the one artifact no gate
+   applies.
+2. **The two runtimes do not agree over the RFC 3339 domain**, only over the shipped fixtures. The
+   Python check is a bare regex with no calendar or offset-range validation, so it accepts what zod
+   rejects:
+
+   | Document | zod (TS) | pydantic (Python) |
+   | --- | --- | --- |
+   | `2026-02-30T12:00:00Z` (impossible date) | reject | **accept** |
+   | `2026-13-01T12:00:00Z` (invalid month) | reject | **accept** |
+   | `2026-02-29T12:00:00Z` (not a leap year) | reject | **accept** |
+   | `2026-09-17T12:00:00+24:00` (offset outside RFC 3339) | reject | **accept** |
+
+   The consequence is concrete: **the Python consumer would process an envelope the producer could never
+   emit.** The strong claim — "both runtimes honor the same contract" — is true of the sample and false
+   of the domain.
+3. **The vocabulary scan's token list is too wide, and it does not scan the validators.** It bans
+   `consumer`, which is the domain's own word for the Python side (C3's text says "the Python
+   consumer"), and it misses one occurrence in a validator comment because validators are not scanned.
+   The rule should name Redis-specific tokens (`xadd`, `xreadgroup`, `xack`, `xautoclaim`, `xgroup`,
+   `delivery_count`, `redis`), not words the specification uses to name its own actors.
+4. **The `quality` enum is duplicated by construction**: the registry declares it and both validators
+   hardcode it. The design sanctions hand-maintenance ("generated from or hand-maintained against the
+   JSON Schema"), and the gate **does** police the drift — adding `96k` to the registry fails the suite
+   — so this is recorded as an accepted, policed duplication rather than a defect. Changing it still
+   costs two edits where "a registry change, not a code change" implies one.
+
+**What held, and it held mechanically rather than by report:** fixture parity across all 23 documents
+(enumerated independently: no file read by only one side, no file left unread); all twelve invalid
+fixtures invalid *for the reason their name states*; the fourth-field rejection performed by the
+**parsers** (`additionalProperties` plus zod's `.strict()` and pydantic's `extra="forbid"`), not
+merely by a post-parse key check; the numeric limits duplicated nowhere but the registry; and a wrong
+**runtime** contract not constructible at all, because it is pinned from two directions.
+
+**Fix plan, before this feature closes** — the gate has to apply the contract it claims to apply:
+
+- **F1**: assertions that read the schema's semantics (`additionalProperties: false`, the `const`
+  version, `format: date-time`, exactly three properties), in both suites.
+- **F2**: calendar-aware date validation on the Python side instead of a regex, plus fixtures for an
+  impossible date, an invalid month, a non-leap February 29th and a `+24:00` offset — so parity is
+  measured over the **domain** and not over the sample.
+- **F3**: narrow the scan to Redis-specific tokens and include both validator modules.
 
 ## Out of scope
 
