@@ -39,14 +39,13 @@ evidence too.
 | 4 | `core.autocrlf=true` leaves CRLF in the working copy, which is what Docker copies into the build context | **LF for all text**, in the repository and in the working copy: `* text=auto eol=lf`. |
 
 ## Findings that changed the list
-
 ### F1 — the stale SDD runtime record can no longer be closed, and it is not what reports `next: apply`
 
 The S1 list says the runtime record `.git/gentle-ai/sdd-runtime/v1/audio-extract-vertical-slice/`
 holds an `attempt/begin` with no matching `end`, and that `gentle-ai sdd-status` therefore still
 reports `next: apply`. Half of that is wrong.
 
-```
+```text
 $ gentle-ai sdd-attempt --help
 Usage: gentle-ai sdd-attempt grant [flags]
 Record explicit per-change edit authority. Runtime attempt operations are retired.
@@ -85,6 +84,45 @@ Recorded in task 1.7.
   binding, and still belongs to WU-2, not here. It is a constraint on a future feature, not a
   residue of this one.
 
+### F4 — the `large-class` advisory reproduces, and the rule is the thing that is wrong
+
+Re-measured 2026-09-17 with the installed pi-lens 4.2.0 analyzer on the current tree:
+
+```text
+🔎 pi-lens: apps\api\src\health.controller.ts — 0 blocking, 0 warning(s), 1 advisory(ies)
+  ⚠ L18 large-class: [slop] Large class detected — consider splitting responsibilities
+```
+
+Exit `0`. It reproduces, and it should not be acted on: the message claims "more than 20 methods"
+while the shipped rule carries **no method-count condition**, and the rule's own test fixture marks
+`class A { foo() {} }` — a one-method class — as a violation. The tool flags any class with at least
+one method. Disposition: leave the controller alone, suppress nothing in code. If the noise ever
+matters, the defect to fix is the rule's arity, not the file.
+
+### F5 — the knip finding in `apps/api` is gone, and knip found a different one that is real
+
+The original claim — every NestJS dependency in `apps/api/package.json` reported as unused — **does
+not reproduce**. `pnpm dlx knip --workspace api` exits `0` with no output on the current tree: the
+premise of that finding was that `apps/api/src/` did not exist yet, and it does now.
+
+But the full-workspace run exposes something the S1 list never noticed:
+
+```text
+Unlisted binaries (1)
+uv  package.json
+```
+
+`uv` is a machine-level tool that the root `package.json` script `test:worker` invokes, and knip is
+right that the script depends on a binary the manifest never declares — the same class of problem
+as `make` being absent, one layer down. It is **recorded, not actioned**: knip is not a project
+dependency and has no configuration in this repository (it was run via `pnpm dlx`), so adding a
+`knip.json` to silence a tool nobody has wired into CI would be inventing scope. The finding belongs
+with the decision to adopt knip, and it is listed in *Out of scope* with that reason.
+
+Also unavailable, and not to be confused with clean: `pnpm --filter api exec eslint .` fails with
+`Command "eslint" not found`. This project has no ESLint dependency and no ESLint configuration, so
+that check is **unavailable**, not passing.
+
 ## Tasks
 
 ### 1.1 — Baseline: the stack is green before anything is touched · owner: AI
@@ -112,6 +150,7 @@ git status --short                # must print nothing
 ```
 
 **Acceptance:**
+
 - `git ls-files --eol` reports `i/lf w/lf` for every tracked text file.
 - `git diff --ignore-cr-at-eol HEAD~1 HEAD` prints nothing: the commit changed **only** carriage
   returns. That is the proof that the renormalization did not touch content.
@@ -126,16 +165,26 @@ git status --short                # must print nothing
   rebuilt under ODD in `s1-foundation`.
 - The `API` runner line takes the verified D1 replacement.
 
-**Acceptance — measured, not quoted from the S1 doc:**
+**Acceptance — measured, with the control corrected after measuring it wrong.**
+
+The first version of this criterion used a non-matching *test file* as the negative control. That
+control is worthless, and it took a measurement to see it: `vitest run no/such/spec.ts` exits `1`
+by itself, with or without the flag, so it goes red for a reason that has nothing to do with the
+fix. It was a plausible control, which is exactly what made it dangerous.
+
+The defect lives in the **`--filter` selector**, so the control has to change the selector while
+keeping the flag off and on. A/B, measured 2026-09-17:
 
 ```bash
-pnpm --filter api --fail-if-no-match exec vitest run test/harness.spec.ts   # exit 0
-pnpm --filter api --fail-if-no-match exec vitest run no/such/spec.ts        # exit non-zero
+pnpm --filter nosuchpkg run test:harness                              # exit 0  <- D1 alive
+pnpm --filter nosuchpkg --fail-if-no-match run test:harness           # exit 1
+pnpm --filter nosuchpkg exec vitest run test/harness.spec.ts          # exit 0  <- D1 alive, in the shape the plan prescribed
+pnpm --filter nosuchpkg --fail-if-no-match exec vitest run test/harness.spec.ts  # exit 1
+pnpm --filter api --fail-if-no-match exec vitest run test/harness.spec.ts        # exit 0  real suite, green
 ```
 
-The negative control is the whole point: the prescribed command passed without running anything
-(defect D1), so a green run proves nothing. Only the non-zero exit on a non-matching selector
-proves the gate can fail.
+The flag is what makes the gate capable of failing. This is D1's own lesson repeating one level
+up: the first control was a guess that read as evidence, and only the A/B disproved it.
 
 ### 1.4 — Pin the allowed build scripts · owner: AI
 
@@ -167,7 +216,8 @@ every NestJS dependency as unused before `src/` existed. Both were left unaction
 check against the current tree.
 
 **Acceptance:** either a raw finding plus a decision, or recorded evidence that it no longer
-reproduces. No silent skip, and no action taken purely to silence a linter.
+reproduces. No silent skip, and no action taken purely to silence a linter. **Done — verdicts in
+F4 and F5.**
 
 ### 1.7 — Close the loop in the S1 document, and keep the Spanish copies honest · owner: AI
 
@@ -197,3 +247,7 @@ Empty until 1.1 runs.
   decision and must be revisited before WU-6 and WU-14, inside the SDD plan.
 - Restoring egress denial on the compose network (`internal: true`, defect D4). Doing that requires
   moving the acceptance inside a container first; it is a change of its own.
+- **Adopting knip as a project dependency**, and with it the `uv` unlisted-binary finding from F5.
+  Adding configuration for a tool the repository does not depend on is not hygiene, it is scope.
+- ESLint. The repository has no ESLint dependency and no configuration; that is a stack decision,
+  not a residue to clean up.
