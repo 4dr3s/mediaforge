@@ -1,0 +1,10 @@
+# Line endings: LF in the repository AND LF in the working copy.
+#
+# `core.autocrlf=true` on the author's Windows machine stores LF in the object database but writes
+# CRLF into the working copy — and the Docker build context *is* the working copy. A shell script or
+# an entrypoint copied into a Linux container with CRLF fails in ways that look like anything except
+# a line-ending problem. Declaring `eol=lf` switches that conversion off for text files, so the file
+# the container receives is the file that was reviewed.
+#
+# Binary files are detected by `text=auto` and left untouched.
+* text=auto eol=lf
