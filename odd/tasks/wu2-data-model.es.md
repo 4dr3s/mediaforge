@@ -262,11 +262,28 @@ drift. Como la migración **nunca salió de esta máquina** (la rama es local y 
 único destino), el cambio se pliega en la migración inicial en vez de agregar una segunda — si se
 hubiera compartido, una migración de fixup habría sido la única opción honesta.
 
-**Divergencia conocida, registrada y no escondida:** `design.md` §3 todavía muestra `client_id`,
-`error_class` como `text` y `event_type` como `text`, y la spec de C1 todavía describe el par
-`(client_id, key)`. El design y las specs son artefactos aprobados y esta feature los trata como
-solo-lectura, así que el schema ahora **diverge de ellos a propósito**. Actualizar esos dos artefactos
-es decisión del supervisor y queda listado en *Fuera de alcance* hasta que pase.
+**Divergencia, registrada y ahora cerrada:** `design.md` §3 mostraba `client_id`, `error_class` como
+`text` y `event_type` como `text`, y la spec de C1 describía el par `(client_id, key)`. El design y las
+specs son artefactos aprobados, así que esta feature los trató como solo-lectura y registró la
+divergencia en vez de editarlos sin que se lo pidieran. El supervisor pidió actualizar el ERD el
+2026-09-17, y los dos artefactos se enmendaron en el mismo cambio — ver la tarea 1.8.
+
+### 1.8 — Actualizar el ERD y la spec de C1 al modelo construido · owner: IA
+
+Pedida por el supervisor una vez que la divergencia de arriba estuvo sobre la mesa. `design.md` §3 y
+`specs/submission-validation/spec.md` ahora describen lo que la base hace cumplir, como **enmiendas
+fechadas y explícitas** en vez de reescrituras silenciosas — la convención que este repositorio ya usó
+para el ADR-0001, para que el motivo de cada cambio se lea al lado del cambio.
+
+**Aceptación:** las seis tablas del ERD, los tres tipos enum, los cuatro uniques, las seis claves
+foráneas, los dos CHECK y el índice parcial coinciden con el catálogo vivo sin divergencia en ninguna
+dirección; el §5 ya no afirma que Prisma no puede expresar enums, ni que no existe archivo de schema;
+el requisito de C1 ya no limita la idempotencia a un par; y un verificador independiente confirma la
+coincidencia en vez del escritor.
+
+**Una cosa que esta tarea destapó y no es documentación:** el cliente generado de Prisma estaba viejo
+— `prisma generate` no se había corrido después del cambio de schema, y todos los tests pasaban igual.
+Ver el registro de evidencia.
 
 ## Registro de evidencia
 
@@ -635,6 +652,29 @@ statement crudo, incluida la forma tagged-template que Prisma parametriza — as
 dejar de escribir SQL crudo en esos dos tests y usar el cliente tipado, que es el que usa la
 aplicación. La regla no se silenció: el constructo que objeta ya no está, y el código quedó mejor.
 
+
+### 1.5 — las dos excepciones deliberadas, verificadas (2026-09-17)
+
+Las dos se chequearon contra la base viva en vez de leerse del schema:
+
+```text
+$ psql -c "SELECT column_name, column_default IS NULL AS sin_default FROM information_schema.columns
+            WHERE table_name='artifacts' AND column_name='id'"
+ id | t
+
+$ psql -c "SELECT column_name, data_type, is_nullable FROM information_schema.columns
+            WHERE table_name='jobs' AND column_name='available_at'"
+ available_at | timestamp with time zone | NO
+```
+
+`artifacts.id` no tiene default — el worker lo acuña con `SELECT uuidv7()` antes de promover, y la
+suite de schema afirma la ausencia, que es lo que hace legal ese insert futuro. `jobs.available_at`
+existe y es NOT NULL, y **nada agenda contra él**: un grep en todo el repositorio lo encuentra solo en
+la migración, en la lista de columnas esperadas de la suite, y en inserts de test que le ponen `now()`.
+No hay reaper ni código de agendamiento en este slice, así que la columna es un guard de T4 y nada más
+— exactamente lo que el ERD afirma.
+
+
 ### 1.7 — el defecto de `client_id`, medido (2026-09-17)
 
 El supervisor preguntó por qué `submissions` tiene un `client_id` si no hay autenticación ni registro
@@ -682,6 +722,37 @@ atómica del cambio de estado y la intención de dispatch, con un relay publican
 de eventos; y `submissions` es la **fila de propiedad e idempotencia** de un job (1:1), no un log de
 eventos. `design.md` §3 describe las tablas por cantidad de filas y no por propósito, que es lo que
 hizo que dos cosas distintas parecieran la misma.
+
+
+### 1.8 — el ERD actualizado, y un cliente viejo encontrado (2026-09-17)
+
+El supervisor pidió actualizar el ERD, así que `design.md` §3 y el requisito de idempotencia de C1
+ahora describen lo que la base hace cumplir. Los dos son enmiendas fechadas y explícitas, no
+reescrituras silenciosas, siguiendo la convención que este repositorio ya usó para el ADR-0001.
+Actualizar el ERD solo habría dejado el requisito de C1 limitando la idempotencia a un par
+`(client_id, key)` que ya no existe, que es la misma inconsistencia en un lugar nuevo, así que los dos
+cambiaron juntos.
+
+**El hallazgo que importaba: el cliente generado de Prisma estaba viejo.** Nunca se había corrido
+`prisma generate` después del cambio de schema, así que el runtime data model del cliente todavía
+declaraba `Submission.clientId` y mapeaba `client_id`, y su mapa de enums estaba vacío. **Todos los
+tests pasaban igual**, porque las suites tocan ese modelo solo por `$queryRaw` y por los accesores de
+`job`/`jobInput` — lo viejo era invisible para el gate y habría aparecido como falla de runtime la
+primera vez que WU-3 usara `submission.create(...)` o leyera el enum `FailureClass`. Regenerado, y
+verificado después que no sobrevive ningún campo llamado `clientId`.
+
+**Dos correcciones a mi propia lectura en el camino.** Un primer grep de `client_id` en el cliente
+generado parecía decir que la vejez había sobrevivido a la regeneración, y no: los matches eran los
+**comentarios del propio schema**, que Prisma embebe textualmente en `internal/class.ts` como
+`inlineSchema`. La segunda: ese mismo texto embebido mostró que el header del schema todavía afirmaba
+"three CHECK constraints" incluyendo el de `error_class`, que acababa de pasar a ser enum — un
+comentario viejo encontrado solo porque el archivo generado lo citaba de vuelta. Los dos arreglados; la
+lección del grep es la misma que esta sesión no deja de producir: un match no es un hallazgo hasta que
+leés contra qué matcheó.
+
+**Nota para WU-3:** el cliente se genera en `apps/api/generated/prisma/` y está gitignoreado, así que
+cualquier build que compile la API tiene que correr `prisma generate` primero. La imagen de Docker
+todavía no lo hace porque nada importa el cliente — eso cambia con la primera unidad que lo haga.
 
 ## Fuera de alcance
 

@@ -252,11 +252,27 @@ drift. Because the migration has **never left this machine** (the branch is loca
 is its only destination), the change is folded into the initial migration instead of adding a second
 one — if it had been shared, a fixup migration would have been the only honest option.
 
-**Known divergence, recorded rather than hidden:** `design.md` §3 still shows `client_id`, `text`
-`error_class` and `text` `event_type`, and C1's spec still describes the `(client_id, key)` pair. The
-design and the specs are approved artifacts and this feature treats them as read-only, so the
-schema now **diverges from them on purpose**. Updating those two artifacts is the supervisor's call
-and is listed in *Out of scope* until it happens.
+**Divergence, recorded and now closed:** `design.md` §3 showed `client_id`, `text` `error_class` and
+`text` `event_type`, and C1's spec described the `(client_id, key)` pair. The design and the specs are
+approved artifacts, so this feature treated them as read-only and recorded the divergence instead of
+editing them unasked. The supervisor asked for the ERD to be updated on 2026-09-17, and both artifacts
+were amended in the same change — see task 1.8.
+
+### 1.8 — Update the ERD and the C1 spec to the built model · owner: AI
+
+Requested by the supervisor once the divergence above was on the table. `design.md` §3 and
+`specs/submission-validation/spec.md` now describe what the database enforces, as **explicit dated
+amendments** rather than silent rewrites — the convention this repository already used for ADR-0001,
+so the reason for each change is readable next to it.
+
+**Acceptance:** the ERD's six tables, three enum types, four uniques, six foreign keys, two CHECKs and
+partial index match the live catalog with no divergence in either direction; §5 no longer claims that
+Prisma cannot express enums, nor that no schema file exists; the C1 requirement no longer scopes
+idempotency to a pair; and an independent verifier confirms the agreement rather than the writer.
+
+**One thing this task exposed that is not documentation:** the generated Prisma client was stale —
+`prisma generate` had not been run after the schema changed, and every test passed anyway. See the
+evidence log.
 
 ## Evidence log
 
@@ -609,6 +625,29 @@ raw statement, including the tagged-template form Prisma parameterizes — so th
 writing raw SQL in those two tests and use the typed client, which is the client the application uses.
 The rule was not suppressed; the construct it objects to is gone, and the code is better for it.
 
+
+### 1.5 — the two deliberate exceptions, verified (2026-09-17)
+
+Both were checked against the live database rather than read off the schema:
+
+```text
+$ psql -c "SELECT column_name, column_default IS NULL AS sin_default FROM information_schema.columns
+            WHERE table_name='artifacts' AND column_name='id'"
+ id | t
+
+$ psql -c "SELECT column_name, data_type, is_nullable FROM information_schema.columns
+            WHERE table_name='jobs' AND column_name='available_at'"
+ available_at | timestamp with time zone | NO
+```
+
+`artifacts.id` has no default — the worker mints it with `SELECT uuidv7()` before promoting, and the
+schema suite asserts the absence, which is what makes that future insert legal. `jobs.available_at`
+exists and is NOT NULL, and **nothing schedules against it**: a repository-wide grep finds it only in
+the migration, the suite's expected-column list, and test inserts that set it to `now()`. There is no
+reaper and no scheduling code in this slice, so the column is a T4 guard and nothing else — exactly
+what the ERD claims.
+
+
 ### 1.7 — the `client_id` defect, measured (2026-09-17)
 
 The supervisor asked why `submissions` has a `client_id` when there is no authentication and no
@@ -655,6 +694,35 @@ atomic write of the state change and the dispatch intent, with a relay publishin
 event log; and `submissions` is the **ownership and idempotency row** for one job (1:1), not an event
 log. `design.md` §3 describes the tables by row count and not by purpose, which is what made two
 different things look like the same thing.
+
+
+### 1.8 — the ERD updated, and a stale client found (2026-09-17)
+
+The supervisor asked for the ERD to be updated, so `design.md` §3 and the C1 idempotency requirement
+now describe what the database enforces. Both are explicit dated amendments rather than silent
+rewrites, following the convention this repository already used for ADR-0001. Updating the ERD alone
+would have left the C1 requirement scoping idempotency to a `(client_id, key)` pair that no longer
+exists, which is the same inconsistency in a new place, so both changed together.
+
+**The finding that mattered: the generated Prisma client was stale.** `prisma generate` had never
+been run after the schema changed, so the client's runtime data model still declared `Submission.clientId`
+and mapped `client_id`, and its enum map was empty. **Every test passed anyway**, because the suites
+touch that model only through `$queryRaw` and through `job`/`jobInput` accessors — the stale part was
+invisible to the gate and would have surfaced as a runtime failure the first time WU-3 used
+`submission.create(...)` or read the `FailureClass` enum. Regenerated, and verified afterwards that no
+field named `clientId` survives.
+
+**Two corrections to my own reading along the way.** A first grep for `client_id` in the generated
+client looked like the staleness had survived regeneration, and it had not: the matches were the
+**schema's own comments**, which Prisma embeds verbatim into `internal/class.ts` as `inlineSchema`. The
+second: that same embedded text showed the schema header still claiming "three CHECK constraints"
+including the `error_class` one, which had just become an enum — a stale comment found only because
+the generated file quoted it back. Both fixed; the grep lesson is the same one this session keeps
+producing, that a match is not a finding until you read what it matched.
+
+**A note for WU-3:** the client is generated into `apps/api/generated/prisma/` and gitignored, so any
+build that compiles the API must run `prisma generate` first. The Docker image does not do it yet
+because nothing imports the client — that changes with the first unit that does.
 
 ## Out of scope
 
