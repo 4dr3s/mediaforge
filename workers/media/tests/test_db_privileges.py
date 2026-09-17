@@ -323,8 +323,8 @@ async def test_api_can_actually_write_its_create_transaction() -> None:
             )
             await connection.execute(
                 """
-                INSERT INTO submissions (job_id, client_id, idempotency_key, creator_token_hash, created_at)
-                VALUES ($1, 'client-1', 'key-1', 'sha256:deadbeef', now())
+                INSERT INTO submissions (job_id, idempotency_key, creator_token_hash, created_at)
+                VALUES ($1, 'key-1', 'sha256:deadbeef', now())
                 """,
                 job_id,
             )

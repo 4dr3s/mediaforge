@@ -2,15 +2,15 @@
  * WU-2 / task 1.1 — the schema contract suite (RED-first).
  *
  * Every assertion here reads the **migrated database**, never the schema file. That is the point:
- * Prisma cannot express the three CHECK constraints or the partial outbox index, so those live
- * only in the hand-edited migration. A schema file that says the right thing while the database
- * says something else is exactly the failure this suite exists to catch, and only the database
- * can prove what landed.
+ * Prisma cannot express the two CHECK constraints or the partial outbox index, so those live only
+ * in the hand-edited migration. A schema file that says the right thing while the database says
+ * something else is exactly the failure this suite exists to catch, and only the database can
+ * prove what landed.
  *
  * (Correction, recorded here rather than repeated: `design.md` §5 claims the `state` enum is also
- * something Prisma cannot express, but Prisma *can* express it natively — it generates the
- * `CREATE TYPE` for an enum on `prisma migrate`. Only the CHECK constraints and the partial
- * index are hand-edited into the generated migration.)
+ * something Prisma cannot express, but Prisma *can* express enums natively — it generates the
+ * `CREATE TYPE` for `state`, `error_class` and `event_type` on `prisma migrate`. Only the two
+ * CHECK constraints and the partial index are hand-edited into the generated migration.)
  *
  * The catalog is the contract, and one behavioral assertion proves the catalog is not a story: a
  * duplicate ordinal must be rejected by the engine, not merely declared in `pg_constraint`.
@@ -23,21 +23,18 @@
  * `beforeAll` client turns an unreachable database into `skipped`, which reads as "nothing was
  * checked" instead of "PostgreSQL is not answering".
  */
-import { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
 
-const DATABASE_URL_TEST =
-  process.env.DATABASE_URL_TEST ?? 'postgresql://postgres:postgres@localhost:5432/mediaforge_test';
+import { PrismaClient } from '../generated/prisma/client';
+import { withClient } from './prisma-client';
 
-async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
-  const client = new Client({ connectionString: DATABASE_URL_TEST });
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.end();
-  }
-}
+/**
+ * Thrown at the end of every deliberate transaction in this file. Prisma rolls back when the
+ * callback throws, so this is how a test asks for a rollback — and asserting the *sentinel* is what
+ * keeps a deliberate rollback distinguishable from a database error. A test that merely expected
+ * "it threw" would pass on a typo in the statement.
+ */
+const ROLLBACK = new Error('rollback on purpose');
 
 type ColumnRow = {
   column_name: string;
@@ -48,15 +45,12 @@ type ColumnRow = {
 };
 
 /** The columns of a table, in declaration order. An empty array means the table does not exist. */
-async function columnsOf(client: Client, table: string): Promise<ColumnRow[]> {
-  const { rows } = await client.query<ColumnRow>(
-    `SELECT column_name, data_type, udt_name, column_default, is_nullable
-       FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = $1
-      ORDER BY ordinal_position`,
-    [table],
-  );
-  return rows;
+async function columnsOf(client: PrismaClient, table: string): Promise<ColumnRow[]> {
+  return await client.$queryRaw<ColumnRow[]>`
+    SELECT column_name, data_type, udt_name, column_default, is_nullable
+      FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = ${table}
+     ORDER BY ordinal_position`;
 }
 
 /**
@@ -69,33 +63,30 @@ async function columnsOf(client: Client, table: string): Promise<ColumnRow[]> {
  * (`indpred IS NOT NULL`) are excluded because they enforce uniqueness only inside their subset,
  * never globally.
  */
-async function uniqueColumnSets(client: Client, table: string): Promise<string[][]> {
-  // `json_agg`, not `array_agg`: node-postgres does not parse `text[]` results, so `array_agg`
-  // arrives as the literal string `'{job_id,ordinal}'` and every comparison against a real array
-  // fails. `json` IS parsed by default, so the driver hands back an actual array. Measured in the
-  // GREEN run: the `array_agg` version reported `'{id}'` where `['id']` was expected.
-  const { rows } = await client.query<{ cols: string[] }>(
-    `SELECT json_agg(a.attname ORDER BY a.attname) AS cols
-       FROM pg_index i
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
-      WHERE i.indisunique AND i.indpred IS NULL AND t.relname = $1
-      GROUP BY i.indexrelid`,
-    [table],
-  );
+async function uniqueColumnSets(client: PrismaClient, table: string): Promise<string[][]> {
+  // `json_agg`, not `array_agg`: the driver under Prisma is still node-postgres, which does not
+  // parse `text[]` results — `array_agg` arrives as the literal string `'{job_id,ordinal}'` and
+  // every comparison against a real array fails. `json` IS parsed, so the driver hands back an
+  // actual array. Measured in the GREEN run: the `array_agg` version reported `'{id}'` where
+  // `['id']` was expected.
+  const rows = await client.$queryRaw<{ cols: string[] }[]>`
+    SELECT json_agg(a.attname ORDER BY a.attname) AS cols
+      FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+     WHERE i.indisunique AND i.indpred IS NULL AND t.relname = ${table}
+     GROUP BY i.indexrelid`;
   return rows.map((row) => row.cols);
 }
 
 /** The leading column of every index on a table: what a single-column lookup can actually use. */
-async function leadingIndexColumns(client: Client, table: string): Promise<string[]> {
-  const { rows } = await client.query<{ column_name: string }>(
-    `SELECT a.attname AS column_name
-       FROM pg_index i
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
-      WHERE t.relname = $1`,
-    [table],
-  );
+async function leadingIndexColumns(client: PrismaClient, table: string): Promise<string[]> {
+  const rows = await client.$queryRaw<{ column_name: string }[]>`
+    SELECT a.attname AS column_name
+      FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+     WHERE t.relname = ${table}`;
   return rows.map((row) => row.column_name);
 }
 
@@ -105,76 +96,69 @@ async function leadingIndexColumns(client: Client, table: string): Promise<strin
  * alone: the leading column is what the poll's plan actually uses, so it must be checked too.
  */
 async function partialIndexes(
-  client: Client,
+  client: PrismaClient,
   table: string,
 ): Promise<{ column_name: string; key_columns: number; predicate: string }[]> {
-  const { rows } = await client.query<{
-    column_name: string;
-    key_columns: number;
-    predicate: string;
-  }>(
-    `SELECT a.attname AS column_name, i.indnkeyatts AS key_columns,
-            pg_get_expr(i.indpred, i.indrelid) AS predicate
-       FROM pg_index i
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
-      WHERE t.relname = $1 AND i.indpred IS NOT NULL`,
-    [table],
-  );
-  return rows;
+  return await client.$queryRaw<
+    { column_name: string; key_columns: number; predicate: string }[]
+  >`
+    SELECT a.attname AS column_name, i.indnkeyatts AS key_columns,
+           pg_get_expr(i.indpred, i.indrelid) AS predicate
+      FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+     WHERE t.relname = ${table} AND i.indpred IS NOT NULL`;
 }
 
 /**
  * CHECK constraints of a table, with the columns each one references. Tying a check to its column
  * via `conkey` is what "a constraint ON column X" means: a constraint that merely mentions
- * `error_class` in its text while constraining a different column is not a constraint on it.
+ * `ordinal` in its text while constraining a different column is not a constraint on it.
  */
 async function checkConstraints(
-  client: Client,
+  client: PrismaClient,
   table: string,
 ): Promise<{ def: string; columns: string[] }[]> {
-  const { rows } = await client.query<{ def: string; columns: string[] }>(
-    `SELECT pg_get_constraintdef(c.oid) AS def,
-            ARRAY(SELECT a.attname
-                    FROM pg_attribute a
-                   WHERE a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)) AS columns
-       FROM pg_constraint c
-       JOIN pg_class t ON t.oid = c.conrelid
-      WHERE c.contype = 'c' AND t.relname = $1`,
-    [table],
-  );
-  return rows;
+  // `json_agg` for the column list as well, for the same reason as `uniqueColumnSets`: the driver
+  // does not hand back a `text[]` as an array, and a string would make `columns.includes(...)`
+  // either wrong or a type error.
+  return await client.$queryRaw<{ def: string; columns: string[] }[]>`
+    SELECT pg_get_constraintdef(c.oid) AS def,
+           COALESCE(
+             (SELECT json_agg(a.attname)
+                FROM pg_attribute a
+               WHERE a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)),
+             '[]'::json) AS columns
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+     WHERE c.contype = 'c' AND t.relname = ${table}`;
 }
 
 /** The columns of a table's primary key, or an empty array when the table has none. */
-async function primaryKeyColumns(client: Client, table: string): Promise<string[]> {
+async function primaryKeyColumns(client: PrismaClient, table: string): Promise<string[]> {
   // `json_agg` for the same measured reason as `uniqueColumnSets` above.
-  const { rows } = await client.query<{ cols: string[] }>(
-    `SELECT json_agg(a.attname ORDER BY a.attnum) AS cols
-       FROM pg_index i
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
-      WHERE t.relname = $1 AND i.indisprimary
-      GROUP BY i.indexrelid`,
-    [table],
-  );
+  const rows = await client.$queryRaw<{ cols: string[] }[]>`
+    SELECT json_agg(a.attname ORDER BY a.attnum) AS cols
+      FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+     WHERE t.relname = ${table} AND i.indisprimary
+     GROUP BY i.indexrelid`;
   return rows.length > 0 ? rows[0].cols : [];
 }
 
 /** Every foreign-key column of a table, with the table it points at. */
 async function foreignKeys(
-  client: Client,
+  client: PrismaClient,
 ): Promise<{ table: string; column: string; references: string }[]> {
-  const { rows } = await client.query<{ table: string; column: string; references: string }>(
-    `SELECT tc.table_name AS table, kcu.column_name AS column, ccu.table_name AS references
-       FROM information_schema.table_constraints tc
-       JOIN information_schema.key_column_usage kcu
-         ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
-       JOIN information_schema.constraint_column_usage ccu
-         ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'`,
-  );
-  return rows;
+  return await client.$queryRaw<{ table: string; column: string; references: string }[]>`
+    SELECT tc.table_name AS table, kcu.column_name AS column, ccu.table_name AS references
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu
+        ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
+      JOIN information_schema.constraint_column_usage ccu
+        ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
+     WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'`;
 }
 
 const EXPECTED_TABLES = ['jobs', 'job_inputs', 'attempts', 'submissions', 'artifacts', 'outbox'];
@@ -243,15 +227,18 @@ const EXPECTED_COLUMNS: Record<string, ColumnSpec[]> = {
     { name: 'lease_expires_at', data_type: 'timestamp with time zone', nullable: false },
     { name: 'started_at', data_type: 'timestamp with time zone', nullable: false },
     { name: 'ended_at', data_type: 'timestamp with time zone', nullable: true },
-    { name: 'error_class', data_type: 'text', nullable: true },
+    // `USER-DEFINED` for the same reason as `jobs.state`: the label set and its order are
+    // asserted separately against the column's actual type.
+    { name: 'error_class', data_type: 'USER-DEFINED', nullable: true },
     { name: 'error_code', data_type: 'text', nullable: true },
     { name: 'created_at', data_type: 'timestamp with time zone', nullable: false },
   ],
   submissions: [
     { name: 'id', data_type: 'uuid', nullable: false },
     { name: 'job_id', data_type: 'uuid', nullable: false },
-    { name: 'client_id', data_type: 'text', nullable: true },
-    { name: 'idempotency_key', data_type: 'text', nullable: true },
+    // `client_id` is gone (task 1.7): idempotency is one globally unique key, and it must be NOT
+    // NULL — a nullable key is no key, because PostgreSQL treats NULLs as distinct.
+    { name: 'idempotency_key', data_type: 'text', nullable: false },
     { name: 'creator_token_hash', data_type: 'text', nullable: false },
     { name: 'created_at', data_type: 'timestamp with time zone', nullable: false },
   ],
@@ -269,7 +256,8 @@ const EXPECTED_COLUMNS: Record<string, ColumnSpec[]> = {
   outbox: [
     { name: 'id', data_type: 'uuid', nullable: false },
     { name: 'job_id', data_type: 'uuid', nullable: false },
-    { name: 'event_type', data_type: 'text', nullable: false },
+    // `USER-DEFINED`: `event_type` is an enum whose single label is asserted separately.
+    { name: 'event_type', data_type: 'USER-DEFINED', nullable: false },
     { name: 'payload', data_type: 'jsonb', nullable: false },
     { name: 'published_at', data_type: 'timestamp with time zone', nullable: true },
     { name: 'attempts', data_type: 'integer', nullable: false },
@@ -290,12 +278,11 @@ const EXPECTED_FOREIGN_KEYS = [
 describe('schema :: tables exist', () => {
   it('creates exactly the six tables of the ERD', async () => {
     await withClient(async (client) => {
-      const { rows } = await client.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables
-          WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-            AND table_name <> '_prisma_migrations'
-          ORDER BY table_name`,
-      );
+      const rows = await client.$queryRaw<{ table_name: string }[]>`
+        SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+           AND table_name <> '_prisma_migrations'
+         ORDER BY table_name`;
 
       // `_prisma_migrations` is excluded on purpose: it is Prisma's own migration ledger, created
       // by the tool that applies this schema, not a table of the domain model. Counting it would
@@ -317,14 +304,12 @@ describe('schema :: the six states, and no seventh', () => {
       // not depend on the type's name — only on the fact that it is an enum with these six labels.
       // `enumsortorder` is the order the type was *declared* in (the order §3 fixes), not the
       // alphabetical order a label-set comparison would silently allow.
-      const { rows } = await client.query<{ enumlabel: string }>(
-        `SELECT e.enumlabel
-           FROM pg_enum e
-           JOIN pg_type ty ON ty.oid = e.enumtypid
-          WHERE ty.typname = $1
-          ORDER BY e.enumsortorder`,
-        [stateColumn!.udt_name],
-      );
+      const rows = await client.$queryRaw<{ enumlabel: string }[]>`
+        SELECT e.enumlabel
+          FROM pg_enum e
+          JOIN pg_type ty ON ty.oid = e.enumtypid
+         WHERE ty.typname = ${stateColumn!.udt_name}
+         ORDER BY e.enumsortorder`;
 
       expect(rows.map((row) => row.enumlabel)).toEqual([
         'created',
@@ -345,8 +330,10 @@ describe('schema :: uniqueness is enforced, and by the engine', () => {
       expect(await uniqueColumnSets(client, 'attempts')).toContainEqual(
         setOf(['job_id', 'attempt_no']),
       );
+      // The `(client_id, idempotency_key)` pair is gone with `client_id` (task 1.7): the key is
+      // unique globally, so a repeated key is rejected no matter who submitted it.
       expect(await uniqueColumnSets(client, 'submissions')).toContainEqual(
-        setOf(['client_id', 'idempotency_key']),
+        setOf(['idempotency_key']),
       );
       expect(await uniqueColumnSets(client, 'submissions')).toContainEqual(setOf(['job_id']));
     });
@@ -354,31 +341,79 @@ describe('schema :: uniqueness is enforced, and by the engine', () => {
 
   it('rejects a duplicate (job_id, ordinal) with a real unique violation', async () => {
     await withClient(async (client) => {
-      await client.query('BEGIN');
-      try {
-        const { rows: jobRows } = await client.query<{ id: string }>(
-          `INSERT INTO jobs (job_type, params, state, available_at, created_at, updated_at)
-           VALUES ('audio.extract', '{}'::jsonb, 'created', now(), now(), now())
-           RETURNING id`,
-        );
-        const jobId = jobRows[0].id;
+      await expect(
+        client.$transaction(async (tx) => {
+          // The generated client, not raw SQL. It is the client the application uses, so exercising
+          // it here proves the schema and the client agree — and it is parameterized by
+          // construction, which is the honest way to answer a linter that flags interpolation in a
+          // raw statement instead of suppressing it.
+          const job = await tx.job.create({
+            data: {
+              jobType: 'audio.extract',
+              params: {},
+              state: 'created',
+              availableAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
 
-        const insertInput = (ordinal: number) =>
-          client.query(
-            `INSERT INTO job_inputs (job_id, ordinal, declared_type, storage_key, byte_size, created_at)
-             VALUES ($1, $2, 'video/mp4', $3, 1024, now())`,
-            [jobId, ordinal, `inbox/${jobId}/${ordinal}`],
-          );
+          const insertInput = (ordinal: number) =>
+            tx.jobInput.create({
+              data: {
+                jobId: job.id,
+                ordinal,
+                declaredType: 'video/mp4',
+                storageKey: `inbox/${job.id}/${ordinal}`,
+                byteSize: 1024n,
+                createdAt: new Date(),
+              },
+            });
 
-        await insertInput(1);
+          await insertInput(1);
 
-        // 23505 is `unique_violation`. Asserting the SQLSTATE rather than "it threw" is what makes
-        // this a statement about the constraint instead of about any error at all.
-        await expect(insertInput(1)).rejects.toMatchObject({ code: '23505' });
-      } finally {
-        // Rolled back on purpose: this test proves enforcement, it does not leave rows behind.
-        await client.query('ROLLBACK');
-      }
+          // `P2002` is Prisma's code for a unique-constraint violation, and asserting *that code*
+          // rather than "it threw" is what makes this a statement about the constraint: a typo in
+          // the call would fail differently and would not pass.
+          await expect(insertInput(1)).rejects.toMatchObject({ code: 'P2002' });
+
+          throw ROLLBACK;
+        }),
+      ).rejects.toBe(ROLLBACK);
+    });
+  });
+
+  it('accepts ordinal 2, so the CHECK is a lower bound and not an equality', async () => {
+    await withClient(async (client) => {
+      // Catches `CHECK (ordinal >= 1 AND ordinal <= 1)`: it satisfies the regex the CHECK suite
+      // uses while violating the ERD, and only execution tells the two apart.
+      await expect(
+        client.$transaction(async (tx) => {
+          const job = await tx.job.create({
+            data: {
+              jobType: 'audio.extract',
+              params: {},
+              state: 'created',
+              availableAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+
+          await tx.jobInput.create({
+            data: {
+              jobId: job.id,
+              ordinal: 2,
+              declaredType: 'video/mp4',
+              storageKey: `inbox/${job.id}/2`,
+              byteSize: 1024n,
+              createdAt: new Date(),
+            },
+          });
+
+          throw ROLLBACK;
+        }),
+      ).rejects.toBe(ROLLBACK);
     });
   });
 });
@@ -475,6 +510,40 @@ describe('schema :: ids are database-minted', () => {
   });
 });
 
+describe("schema :: the defaults the design's canonical SQL requires", () => {
+  it('defaults exactly the three columns §6 inserts without providing, and no other', async () => {
+    await withClient(async (client) => {
+      const withDefaults: string[] = [];
+      for (const table of EXPECTED_TABLES) {
+        for (const column of await columnsOf(client, table)) {
+          // `id` is excluded because every primary key except `artifacts.id` carries a `uuidv7()`
+          // default and that is asserted by its own test. What matters here is every *other*
+          // column: the design's canonical SQL is what decides, not the ERD drawing, which shows
+          // no defaults at all.
+          if (column.column_name !== 'id' && column.column_default !== null) {
+            withDefaults.push(`${table}.${column.column_name}`);
+          }
+        }
+      }
+
+      // `design.md` §6 inserts `outbox` (line 355) and `attempts` (line 379) without these columns,
+      // and all three are NOT NULL — so they cannot be un-defaulted. No other column may carry one:
+      // a default where the design is silent would paper over a forgotten value instead of failing
+      // loudly, which is the whole reason the other columns have none.
+      expect(withDefaults.sort()).toEqual([
+        'attempts.created_at',
+        'outbox.attempts',
+        'outbox.created_at',
+      ]);
+
+      const attemptsColumn = (await columnsOf(client, 'outbox')).find(
+        (column) => column.column_name === 'attempts',
+      );
+      expect(attemptsColumn?.column_default, 'outbox.attempts must default to 0').toMatch(/^0/);
+    });
+  });
+});
+
 describe('schema :: the partial index the relay poll needs', () => {
   it('indexes outbox on published_at, WHERE published_at IS NULL', async () => {
     await withClient(async (client) => {
@@ -501,7 +570,7 @@ describe('schema :: the partial index the relay poll needs', () => {
 });
 
 describe('schema :: CHECK constraints Prisma cannot express', () => {
-  it('constrains ordinal, attempt_no and error_class, each on its own column', async () => {
+  it('constrains ordinal and attempt_no, each on its own column', async () => {
     await withClient(async (client) => {
       const inputs = await checkConstraints(client, 'job_inputs');
       const attempts = await checkConstraints(client, 'attempts');
@@ -528,21 +597,53 @@ describe('schema :: CHECK constraints Prisma cannot express', () => {
         'no CHECK spelling attempt_no >= 1 on attempts',
       ).toBe(true);
 
-      // The label set is compared exactly, not searched for: `CHECK (error_class = 'non_retryable')`
-      // matched the old `/retryable/` substring inside `non_retryable` while forbidding the
-      // retryable label entirely. Extract the quoted literals from every CHECK that references
-      // `error_class` and compare the union to the two labels §3 fixes.
-      const labels = [
-        ...new Set(
-          onColumn(attempts, 'error_class').flatMap((check) =>
-            [...check.def.matchAll(/'([^']+)'/g)].map((match) => match[1]),
-          ),
-        ),
-      ].sort();
-      expect(labels, 'error_class CHECK must allow exactly retryable and non_retryable').toEqual([
-        'non_retryable',
-        'retryable',
-      ]);
+      // `error_class` is not here. Its domain moved from CHECK-constrained text to the
+      // `FailureClass` enum, asserted in the enum suite below.
+    });
+  });
+});
+
+describe('schema :: closed-set domains are enum types, not CHECK-constrained text', () => {
+  it('types attempts.error_class as an enum with exactly retryable and non_retryable, in order, and keeps it nullable', async () => {
+    await withClient(async (client) => {
+      const errorClass = (await columnsOf(client, 'attempts')).find(
+        (column) => column.column_name === 'error_class',
+      );
+      expect(errorClass, 'attempts.error_class is missing').toBeDefined();
+
+      // The CHECK is gone on purpose (task 1.7): a CHECK could be written in a way that forbids
+      // NULL on a column the design declares nullable, and a type cannot. The enum still rejects
+      // a third value exactly as the CHECK did, and the column stays nullable by declaration.
+      expect(errorClass!.is_nullable, 'attempts.error_class must stay nullable').toBe('YES');
+
+      // `enumsortorder` is the order the type was *declared* in, not alphabetical order — the
+      // same claim the `jobs.state` suite makes, for a domain of two.
+      const rows = await client.$queryRaw<{ enumlabel: string }[]>`
+        SELECT e.enumlabel
+          FROM pg_enum e
+          JOIN pg_type ty ON ty.oid = e.enumtypid
+         WHERE ty.typname = ${errorClass!.udt_name}
+         ORDER BY e.enumsortorder`;
+
+      expect(rows.map((row) => row.enumlabel)).toEqual(['retryable', 'non_retryable']);
+    });
+  });
+
+  it('types outbox.event_type as an enum whose label is exactly job.queued', async () => {
+    await withClient(async (client) => {
+      const eventType = (await columnsOf(client, 'outbox')).find(
+        (column) => column.column_name === 'event_type',
+      );
+      expect(eventType, 'outbox.event_type is missing').toBeDefined();
+
+      const rows = await client.$queryRaw<{ enumlabel: string }[]>`
+        SELECT e.enumlabel
+          FROM pg_enum e
+          JOIN pg_type ty ON ty.oid = e.enumtypid
+         WHERE ty.typname = ${eventType!.udt_name}
+         ORDER BY e.enumsortorder`;
+
+      expect(rows.map((row) => row.enumlabel)).toEqual(['job.queued']);
     });
   });
 });
