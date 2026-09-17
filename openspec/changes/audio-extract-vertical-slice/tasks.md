@@ -71,7 +71,7 @@ is chosen. The parent owes the delivery decision before `apply`.
 
 ### Runners and canonical commands
 
-- **API:** Vitest — `pnpm --filter api exec vitest run <file>`. Always against a **real
+- **API:** Vitest — `pnpm --filter api --fail-if-no-match exec vitest run <file>`. Always against a **real
   PostgreSQL 18** test database (`mediaforge_test`) and a **real Redis** test db number; never
   SQLite (false negatives on `uuidv7()`, `FOR UPDATE`, partial indexes, CAS semantics).
 - **Worker:** pytest + `pytest-asyncio` — `uv run --project workers/media pytest
@@ -93,26 +93,32 @@ fixtures, harnesses).
 
 ## S1 — Foundation
 
+> **Note (2026-09-17):** the seven boxes WU-1 1.1–1.4, WU-5 5.1–5.2, and WU-13 13.2 were
+> unchecked again on 2026-09-17 because the S1 apply artifacts they attested were deleted by
+> supervisor decision and the work was rebuilt from scratch under ODD in
+> `odd/tasks/s1-foundation.md`. The plan's checkboxes therefore describe intent, not shipped
+> evidence; see `odd/tasks/repo-hygiene.md`.
+
 ### WU-1 — Workspace scaffold, toolchains, and test-harness bootstrap · owner: toil
 
 **Anchors:** design §2 (topology + module layout), §2.1 (Postgres 18, Redis 7, shared
 `mediaforge-storage` volume), §11 (runners); `openspec/config.yaml` `testing.strict_tdd`;
 ADR-0002 (Redis Streams); `project.md` (stack: NestJS + TS API, Python 3.11 worker via `uv`).
 
-- [x] 1.1 RED — write `apps/api/test/harness.spec.ts` (Vitest) asserting a live connection to
+- [ ] 1.1 RED — write `apps/api/test/harness.spec.ts` (Vitest) asserting a live connection to
   `mediaforge_test` and that `SELECT uuidv7()` returns a version-7 UUID, and
   `workers/media/tests/test_harness.py` (pytest) asserting `asyncpg` connects to the same
   database and Redis is reachable. Watch both fail: no project, no environment. · owner: toil
-- [x] 1.2 Scaffold the pnpm workspace (`package.json`, `pnpm-workspace.yaml`), `apps/api`
+- [ ] 1.2 Scaffold the pnpm workspace (`package.json`, `pnpm-workspace.yaml`), `apps/api`
   NestJS skeleton, `apps/web` placeholder only (no code — no UI in this slice),
   `workers/media` with `uv`/`pyproject.toml`, `contracts/`, Vitest config, pytest-asyncio
   config, `Makefile` targets. · owner: toil
-- [x] 1.3 Write `docker/compose.yaml` (Postgres 18, Redis 7, named volumes including
+- [ ] 1.3 Write `docker/compose.yaml` (Postgres 18, Redis 7, named volumes including
   `mediaforge-storage`, DB `mediaforge`, test DB `mediaforge_test`), `docker/api.Dockerfile`,
   `docker/worker.Dockerfile`, `.env.example` (credentials from env; `.env` gitignored),
   `.gitignore`. · owner: toil
-- [x] 1.4 GREEN — record the exact results of `docker compose up -d --wait`,
-  `pnpm --filter api exec vitest run test/harness.spec.ts`, and
+- [ ] 1.4 GREEN — record the exact results of `docker compose up -d --wait`,
+  `pnpm --filter api --fail-if-no-match exec vitest run test/harness.spec.ts`, and
   `uv run --project workers/media pytest workers/media/tests/test_harness.py`. · owner: toil
 
 **Start:** empty repository (only `openspec/`). **Done:** compose up is healthy; both harness
@@ -190,13 +196,13 @@ validator modules with their tests; nothing else imports them yet.
 design §13; C3 "The Queue Port Is Broker-Agnostic and the Adapter Owns Broker Mechanics".
 This spike **gates WU-6**.
 
-- [x] 5.1 RED/verify (runner: pytest) — write `workers/media/spikes/redis_py_consumer_group_surface.py`
+- [ ] 5.1 RED/verify (runner: pytest) — write `workers/media/spikes/redis_py_consumer_group_surface.py`
   and `workers/media/tests/test_redis_py_spike.py` against a scratch Redis 7: pin the resolved
   `redis` version; assert the documented signatures of `xgroup_create`, `xadd`, `xreadgroup`
   (`>` mode and `0` mode), `xack`, and `xautoclaim`; assert `xautoclaim` **without `JUSTID`**
   increments the delivery count on a second claim; assert `min-idle-time` is interpreted in
   **milliseconds**. Fails until each primitive is confirmed. · owner: artifact
-- [x] 5.2 Record in `workers/media/spikes/RESULTS.md`: exact `redis-py` version, the three call
+- [ ] 5.2 Record in `workers/media/spikes/RESULTS.md`: exact `redis-py` version, the three call
   signatures as used, the delivery-count location in the `xautoclaim` response, and any
   behavioral difference from the command reference. A failure here is ADR-0002's own revisit
   trigger — report it, do not build a workaround. · owner: artifact
@@ -218,7 +224,7 @@ no network) · design §10 "Preconditions, stated honestly". This spike **gates 
   process itself still reaches Postgres and Redis; assert the seccomp profile permits
   `unshare`/`clone` with the namespace flags. Fails when the preconditions do not hold. ·
   owner: artifact
-- [x] 13.2 Record the outcome and the fallback in `workers/media/spikes/RESULTS.md`: the
+- [ ] 13.2 Record the outcome and the fallback in `workers/media/spikes/RESULTS.md`: the
   verified kernel/seccomp facts, and — if blocked — the scoped fallback (a seccomp profile for
   `unshare` only; still non-root and read-only, no `--privileged`, no `CAP_SYS_ADMIN`). If the
   fallback is also blocked, escalate the sandbox decision instead of silently weakening it. ·
