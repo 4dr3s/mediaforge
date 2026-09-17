@@ -1,0 +1,43 @@
+# Build context is the repository root for both images (`context: ..`), so everything excluded
+# here is everything Docker does not have to send on every build.
+#
+# `**/` is not decoration. Docker matches these patterns against the path relative to the context
+# root, so a bare `node_modules/` excludes only the TOP-LEVEL one -- and this is a pnpm workspace,
+# where the node_modules directories that matter are nested (`apps/api/node_modules`). Leaving
+# them in the context copies the host's install on top of the image's own: on Windows those are
+# pnpm shims and absolute symlinks (`/c/Users/...`) that mean nothing inside Linux. Measured cost
+# of getting this wrong (defect D2): the image builds, and then `nest build` dies with
+#   Cannot find module '/app/apps/api/node_modules/@nestjs/cli/bin/nest.js'
+# Same reasoning for `dist/` and `.venv/`: host artifacts, built for the host.
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.turbo/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/storage/
+**/tmp/
+**/*.log
+
+# Host build caches. These are the nastiest kind of context leak: a foreign incremental cache
+# makes the image's own compiler skip work and emit a PARTIAL `dist/` that still reports success
+# (defect D3 -- the container then died with `Cannot find module './app.module'`).
+**/*.tsbuildinfo
+**/.eslintcache
+
+# Credentials never enter an image.
+.env
+.env.*
+!.env.example
+
+# Version control and documentation: not runtime inputs, and .git alone is worth excluding.
+.git/
+.gitignore
+openspec/
+odd/
+.atl/
+.pi/

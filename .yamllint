@@ -1,0 +1,18 @@
+---
+# yamllint configuration for this repository.
+#
+# Nothing here disables a check that could catch a real mistake. One rule needs room:
+#
+#   line-length, max 141
+#     docker/compose.yaml carries the container-internal connection URLs. A value such as
+#     postgresql://postgres:postgres@postgres:5432/mediaforge_test is ONE YAML scalar, and YAML
+#     has no string concatenation, so the line cannot be wrapped -- and the variable names
+#     (DATABASE_URL, DATABASE_URL_TEST, REDIS_URL) are prescribed by design.md §12. The longest
+#     line the file legitimately needs is 141 characters, so the limit is raised just past it
+#     instead of being turned off: anything longer is still reported.
+
+extends: default
+
+rules:
+  line-length:
+    max: 141

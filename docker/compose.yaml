@@ -1,0 +1,183 @@
+---
+# MediaForge local stack -- task 1.3 of the S1 foundation feature.
+# Feature doc: odd/tasks/s1-foundation.md
+#
+#   up:    docker compose -f docker/compose.yaml up -d --wait
+#   down:  docker compose -f docker/compose.yaml down
+#
+# Environment variables. No .env file is required: every one has a default,
+# and the defaults match what the host-side harness tests assume. There is no
+# .env.example either -- this block is the reference, and .env is gitignored
+# so credentials never enter the repository.
+#
+#   POSTGRES_USER       postgres    database user
+#   POSTGRES_PASSWORD   postgres    database password
+#   POSTGRES_DB         mediaforge  development database name
+#   POSTGRES_PORT       5432        HOST port for PostgreSQL
+#   REDIS_PORT          6379        HOST port for Redis
+#   API_PORT            3000        HOST port for the API (the container
+#                                   always listens on 3000)
+#
+# Composed in the service blocks below, not set by hand: DATABASE_URL and
+# DATABASE_URL_TEST (host `postgres`, databases `mediaforge` and
+# `mediaforge_test`) plus REDIS_URL / REDIS_URL_TEST (host `redis`, database
+# 0 and database 1). Tests use the `_test` variants on purpose: a suite that
+# flushes keys must never touch the dispatch stream in database 0.
+#
+# Changing POSTGRES_PORT or REDIS_PORT also means exporting DATABASE_URL_TEST
+# and REDIS_URL_TEST in your shell, or the host-side tests keep looking at the
+# old ports.
+#
+# `--wait` is the acceptance check: every service must report healthy.
+#
+# What this file deliberately does not solve yet:
+#   * the worker's seccomp profile. The spike proved the worker cannot
+#     create namespaces without it, so containment is WU-15's job
+#     (design/spike-sandbox-namespaces.md);
+#   * storage permissions. Nothing writes to `mediaforge-storage` yet, and
+#     the API and the worker run as different uids. Sharing that volume is
+#     a real decision, and it belongs with WU-9 / WU-16.
+
+name: mediaforge
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: mediaforge-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mediaforge}
+    volumes:
+      # Postgres 18 images take the mount at the parent directory,
+      # not at .../data.
+      - mediaforge-pgdata:/var/lib/postgresql
+      # Entrypoint scripts run only while the data directory is empty,
+      # so `mediaforge_test` appears on the first init and never again.
+      # Dropping the volume recreates it.
+      - ./init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    ports:
+      # Published for the host-side harness tests (task 1.4), which
+      # connect to localhost:5432.
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mediaforge-internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: mediaforge-redis
+    # AOF on: the queue is a Redis Stream (ADR-0002), and losing it across
+    # a restart would turn every in-flight job into a mystery.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - mediaforge-redisdata:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mediaforge-internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: mediaforge-api
+    environment:
+      # Container-internal hostnames, never localhost: these are the values
+      # the application uses inside the network. The two connection URLs are
+      # single YAML scalars and exceed 80 columns -- see .yamllint.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-mediaforge}
+      DATABASE_URL_TEST: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-mediaforge}_test
+      REDIS_URL: redis://redis:6379/0
+      REDIS_URL_TEST: redis://redis:6379/1
+      # Fixed at 3000 inside the container; only the host port varies. If the
+      # container port followed API_PORT, the published mapping would point
+      # at a port nothing listens on.
+      PORT: "3000"
+    ports:
+      - "${API_PORT:-3000}:3000"
+    volumes:
+      # Shared, single filesystem: rename(2) is what makes promote()
+      # atomic (ADR-0001).
+      - mediaforge-storage:/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mediaforge-internal
+    healthcheck:
+      # `wget` is why the api image installs it: this probe is what `--wait`
+      # reads. 127.0.0.1 rather than `localhost` because the app binds
+      # 0.0.0.0 (IPv4 only) while `localhost` here also resolves to ::1.
+      # Measured on the host: both answer 200, but the explicit address has
+      # fewer ways to fail.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: mediaforge-worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-mediaforge}
+      DATABASE_URL_TEST: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-mediaforge}_test
+      REDIS_URL: redis://redis:6379/0
+      REDIS_URL_TEST: redis://redis:6379/1
+      # The container filesystem is read-only (below), so uv needs
+      # somewhere writable to put its cache.
+      UV_CACHE_DIR: /tmp/.cache/uv
+    volumes:
+      - mediaforge-storage:/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mediaforge-internal
+    # Hardening that is already meaningful today: this is the component that
+    # will handle untrusted media. It runs unprivileged, cannot gain
+    # privileges, and cannot write its own image.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+volumes:
+  mediaforge-pgdata:
+  mediaforge-redisdata:
+  mediaforge-storage:
+
+networks:
+  mediaforge-internal:
+    driver: bridge
+    # NOT `internal: true`. Measured, not a preference: with an internal
+    # network the containers still reach each other and `up --wait` still
+    # reports every service healthy, but Docker publishes no route, so the
+    # host cannot reach the published ports and BOTH harness tests fail
+    # with a connection refusal. Those host-side commands are what makes
+    # task 1.4 evidence instead of a claim (defect D4). Egress denial can
+    # come back, but only together with moving the acceptance into a
+    # container.
