@@ -60,10 +60,13 @@ the repository wins. The ERD in §3 is the input.
    replaced that on 2026-09-16: the AI writes every file, the supervisor reviews every change.
 2. **RDD stays on** for this feature, accepting the per-work-unit independent verifier.
 3. **The "review before commit" sequence is corrected, not applied.** That rule fixes a *working*
-   facade. Both paths are broken today (`start` demands a `lineageId` that `inspect` never issues;
-   `assess` fails schema validation on any candidate without a risk signal), so the position of the
-   commit relative to the review changes nothing now. Work-unit commits stay, because they are the
-   recovery points and the reviewable units.
+   facade. Today it only works on one path, and this decision was written before that was measured:
+   with the candidate **uncommitted**, `inspect` returns an `execute` transition that issues the
+   `lineageId` itself and offers the complete `review start` route — so the sequence is exactly right
+   there. With the workspace **clean** (everything committed) the projection is empty, the transition
+   becomes `collect` / `empty_candidate_base_ref_required`, and *that* path dead-ends on a `lineageId`
+   its own collect step never issues. `assess` fails schema validation on any candidate without a risk
+   signal. Work-unit commits stay, because they are the recovery points and the reviewable units.
 
 ## Tasks
 
