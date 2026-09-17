@@ -9,10 +9,10 @@
   "scripts": {
     "build:api": "pnpm --filter api run build",
     "dev:api": "pnpm --filter api run start:dev",
-    "test:api": "pnpm --filter api --fail-if-no-match run test:harness",
-    "test:worker": "uv run --project workers/media pytest workers/media/tests/test_harness.py -q"
+    "test:api": "pnpm --filter api --fail-if-no-match run test",
+    "test:worker": "uv run --project workers/media pytest workers/media/tests -q"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@nestjs/core", "esbuild"]
+    "onlyBuiltDependencies": ["@nestjs/core", "esbuild", "@prisma/engines", "prisma"]
   }
 }
