@@ -675,6 +675,35 @@ No hay reaper ni código de agendamiento en este slice, así que la columna es u
 — exactamente lo que el ERD afirma.
 
 
+### 1.6 — Registro de conformidad con el RDD (2026-09-17)
+
+Cada unidad de trabajo de esta feature se evaluó y se verificó de forma independiente. La review nativa
+no pudo arrancar en ningún momento — `inspect` ofrece la ruta `execute` completa solo cuando el
+candidato está sin commitear, y esta feature se fue commiteando a medida que avanzaba — así que cada
+unidad tomó el camino gateado por riesgo: autoverificación del escritor más un verificador
+independiente separado.
+
+| Tarea | Unidades | Resultado de `assess` | Verificación independiente, y qué encontró |
+| --- | --- | --- | --- |
+| 1.1 suite de schema | `3eae126`, `51507f3` | `unassessable` → tratado como high | Refutó la completitud de la suite: construyó **un esquema incorrecto que pasaba las once** aserciones, y predijo el rojo falso de `pg_constraint` que la migración generada después confirmó empíricamente. 11 tests pasaron a 18. |
+| 1.2 suite de privilegios | `dc82072`, `2ff7d56` | `unassessable` → high | Encontró que la matriz barría solo cuatro de los siete privilegios de tabla (`GRANT TRUNCATE` pasaba todo), que el requisito del rol owner del §3 no estaba afirmado, y que el header acreditaba un `.env.example` que no existe. Los tres arreglados. |
+| 1.3 modelo | `3b35895`, `7a96051`, `f325174` | `unassessable` → high | Siete afirmaciones se sostuvieron (la base viva contra el ERD con cero divergencia en ambas direcciones, roles, sin drift, gates cubriendo las suites, la decisión de defaults, nada colado). **Una refutada: la afirmación de esta propia feature de que O2 estaba satisfecha** — `pg` seguía siendo devDependency directa y las dos suites la importaban. |
+| 1.4 O2 | `3577a16`, `e2993f2` | `unassessable` → high | Cerró de verdad la afirmación refutada, y los tres huecos de suite que la verificación de 1.3 había construido. |
+| 1.7 correcciones | `413da09`, `3dfc0e1` | `unassessable` → high | — (las correcciones salieron de la revisión del supervisor sobre los artefactos) |
+| 1.8 ERD y spec | `d183dd2`, `70932fb`, `b0489b3`, `ac9f38d` | `unassessable` → high | **Ninguna afirmación refutada.** Coincidencia exacta con el catálogo vivo, trazado de índices incluido. Dos defectos de redacción encontrados y arreglados, y una afirmación histórica correctamente reportada como corroborada en vez de re-medida. |
+
+**El patrón que vale conservar.** Cuatro verificaciones, y **cada una encontró algo que el escritor no
+había encontrado** — incluida una que refutó la afirmación del propio escritor sobre una constraint
+vinculante. Ese es el argumento del costo, y es por lo que este registro se escribe por unidad de
+trabajo y no como resumen final: un resumen habría dicho "verificado" y perdido los cuatro hallazgos.
+
+**Honestidad del tier.** El tier es `unassessable`-as-high en la mayoría de las unidades porque el
+candidato no llevaba señal de riesgo, que es el defecto registrado en `repo-hygiene.md` y su propio
+registro RDD — el camino pasivo es inalcanzable. Donde el rango sí contenía el `Makefile`, `assess`
+devolvió `high` con razón `process_boundary`. Los dos quedan registrados como salieron; ninguno se
+ajustó a mano.
+
+
 ### 1.7 — el defecto de `client_id`, medido (2026-09-17)
 
 El supervisor preguntó por qué `submissions` tiene un `client_id` si no hay autenticación ni registro

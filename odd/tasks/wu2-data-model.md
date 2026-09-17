@@ -648,6 +648,33 @@ reaper and no scheduling code in this slice, so the column is a T4 guard and not
 what the ERD claims.
 
 
+### 1.6 — RDD conformance record (2026-09-17)
+
+Every work unit in this feature was assessed and independently verified. The native review could not
+start at any point — `inspect` offers a complete `execute` route only when the candidate is
+uncommitted, and this feature was committed as it went — so every unit took the risk-gated path:
+writer self-verification plus a separate independent verifier.
+
+| Task | Work units | `assess` result | Independent verification, and what it found |
+| --- | --- | --- | --- |
+| 1.1 schema suite | `3eae126`, `51507f3` | `unassessable` → treated as high | Refuted the suite's completeness: it constructed **one wrong schema that passed all eleven** assertions, and predicted the `pg_constraint` false-RED that the generated migration then confirmed empirically. 11 tests became 18. |
+| 1.2 privileges suite | `dc82072`, `2ff7d56` | `unassessable` → high | Found that the matrix swept only four of the seven table privileges (`GRANT TRUNCATE` passed everything), that §3's owner-role requirement was unasserted, and that the header credited a `.env.example` that does not exist. All three fixed. |
+| 1.3 model | `3b35895`, `7a96051`, `f325174` | `unassessable` → high | Seven claims held (the live database against the ERD with zero divergence in either direction, roles, no drift, gates covering the suites, the defaults decision, nothing smuggled). **One refuted: this feature's own claim that O2 was satisfied** — `pg` was still a direct devDependency and both suites still imported it. |
+| 1.4 O2 | `3577a16`, `e2993f2` | `unassessable` → high | Closed the refuted claim for real, and the three suite gaps the 1.3 verification had constructed. |
+| 1.7 corrections | `413da09`, `3dfc0e1` | `unassessable` → high | — (the corrections came from the supervisor's review of the artifacts) |
+| 1.8 ERD and spec | `d183dd2`, `70932fb`, `b0489b3`, `ac9f38d` | `unassessable` → high | **No refuted claim.** Exact agreement with the live catalog, query trace included. Two wording defects found and fixed, and one historical claim correctly reported as corroborated rather than re-measured. |
+
+**The pattern worth keeping.** Four verifications, and **every one found something the writer had not**
+— including one that refuted the writer's own claim about a binding constraint. That is the argument
+for the cost, and it is why this record is written per work unit instead of as a closing summary: a
+summary would have said "verified" and lost the four findings.
+
+**Tier honesty.** The tier is `unassessable`-as-high for most units because the candidate carried no
+risk signal, which is the defect recorded in `repo-hygiene.md` and its own RDD record — the passive
+path is unreachable. Where a range did contain the `Makefile`, `assess` returned `high` with a
+`process_boundary` reason instead. Both are recorded as they came out; neither was adjusted by hand.
+
+
 ### 1.7 — the `client_id` defect, measured (2026-09-17)
 
 The supervisor asked why `submissions` has a `client_id` when there is no authentication and no
