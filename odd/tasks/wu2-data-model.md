@@ -40,7 +40,9 @@ the repository wins. The ERD in §3 is the input.
 
 ## Constraints (non-negotiable)
 
-- **Strict TDD.** `openspec/config.yaml` declares `strict_tdd: true`: RED is written and *observed
+- **Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the two
+  gates: `pnpm --filter api --fail-if-no-match run test` (api) and
+  `uv run --project workers/media pytest workers/media/tests -q` (worker). RED is written and *observed
   failing* before any schema exists. A green suite that never went red is not evidence.
 - **One DDL authority.** `apps/api/prisma/migrations/` is the only place DDL lives. The worker emits
   no DDL, ever. Every schema change is a Prisma migration on the API side.
@@ -75,6 +77,50 @@ the repository wins. The ERD in §3 is the input.
    `idempotency_key` becomes NOT NULL and globally unique. The third one fixes a **measured defect**,
    not a style preference — see task 1.7 and the evidence log. The criterion for enum-versus-text is
    now written in the schema header so the next column is not decided by accident.
+
+## Delivery
+
+Recorded 2026-09-17, measured retrospectively from the commits, not estimated at creation — this
+feature predates the field.
+
+- **Strategy:** `feature-branch`, retrospective. The label is the nearest honest vocabulary, and the
+  measured truth is close to it: this feature **did** use a branch. A single feature branch
+  `feat/wu2-data-model` exists locally **and** on `origin` (`origin/feat/wu2-data-model` points at the
+  same commit), and the two are in sync (0 ahead, 0 behind). The branch is not an ancestor of
+  `origin/main` — its merge-base with it is `1c73e4c`, which is `origin/main`'s tip — so the feature
+  never merged into `main`. And no open PR exists: `git ls-remote origin 'refs/pull/*/head'` returns
+  no pull refs (exit `0`, empty output). git cannot rule out a PR that was opened and closed without
+  merging — that probe sees open PRs only.
+- **Forecast:** +4478 authored changed lines (additions plus deletions), measured retrospectively
+  with `git log 1c73e4c..2a62fa7 --numstat`, excluding `pnpm-lock.yaml`, `generated` paths and
+  `.lock` files; split +2092 code/tests, +1219 English docs, +1167 Spanish mirror. Raw output and the
+  per-category decomposition are at `odd-doc-structure.md` §1.5.
+- **Slice boundaries:** one branch, one slice: the range `1c73e4c..2a62fa7` holds the feature's 20
+  commits (no merge commit among them), so the feature is its own single slice. The 20 commit
+  subjects, newest first, verbatim:
+
+```text
+2a62fa7 docs(odd): close the wu2-data-model feature
+6b3c7ed docs(odd): the RDD conformance record, per work unit
+ac9f38d docs(design): fix the two imprecisions the ERD verifier caught, and record it
+b0489b3 docs(odd): record task 1.8, the 1.5 verification, and a stale generated client
+70932fb fix(schema): the header no longer lists a CHECK that became an enum
+d183dd2 docs(design): the ERD and C1 now describe the model that was built
+3dfc0e1 docs(odd): record the data-model correction, close O2, and mirror it to Spanish
+e2993f2 test(db): the suites follow the corrected model, and O2 closes
+413da09 feat(db): enum types for error_class and event_type, and one global idempotency key
+9dbc70d docs(odd): add the Spanish reading copy of the WU-2 feature, and correct it
+7e21065 docs(odd): correct the O2 claim and record what the verifier refuted
+3577a16 test(harness): assert through the Prisma client, not through pg
+f325174 docs(odd): record the WU-2 GREEN evidence and the findings it produced
+7a96051 fix(gates): the canonical test commands now run the whole suite
+3b35895 feat(db): the WU-2 data model, first migration and least-privilege roles
+51507f3 test(schema): strengthen the gate and fix what only GREEN could reveal
+2ff7d56 test(privileges): close the gaps the independent verifier found
+dc82072 test(privileges): RED suite for the two runtime roles
+3eae126 test(schema): RED suite for the WU-2 data model contract
+627979d docs(odd): track the WU-2 data model as an ODD feature
+```
 
 ## Tasks
 
@@ -275,6 +321,21 @@ idempotency to a pair; and an independent verifier confirms the agreement rather
 **One thing this task exposed that is not documentation:** the generated Prisma client was stale —
 `prisma generate` had not been run after the schema changed, and every test passed anyway. See the
 evidence log.
+
+## Progress
+
+State is `[x]` only where the evidence log holds observed proof for that task.
+
+| ID | Task | State | Evidence |
+| --- | --- | --- | --- |
+| 1.1 | RED: the schema contract suite | `[x]` | §1.1 |
+| 1.2 | RED: the least-privilege suite | `[x]` | §1.2 |
+| 1.3 | GREEN: schema, migration, roles | `[x]` | §1.3 |
+| 1.4 | O2: the harness database assertions move to the Prisma client | `[x]` | §1.4 |
+| 1.5 | The two deliberate exceptions, verified as present | `[x]` | §1.5 |
+| 1.6 | RDD conformance, per work unit | `[x]` | §1.6 |
+| 1.7 | Data-model corrections from the supervisor's review | `[x]` | §1.7 |
+| 1.8 | Update the ERD and the C1 spec to the built model | `[x]` | §1.8 |
 
 ## Evidence log
 
@@ -816,3 +877,11 @@ is the supervisor's decision, as always.
 **Next:** WU-3 (the shared TS↔Python dispatch contract). It is the first unit that will import the
 generated Prisma client, so any build that compiles the API must run `prisma generate` first — the
 Docker image does not do it yet because nothing needed it.
+
+## Next step
+
+None — no work remains on this document: the feature is closed, all eight tasks 1.1–1.8 evidenced in
+the log above and every work unit verified independently. The next real work lives elsewhere: WU-3
+(the shared TS↔Python dispatch contract) is tracked as its own feature
+(`odd/tasks/wu3-contract.md`), and — as the build note `## Closure` already records — anything that
+compiles the API must run `prisma generate` first.

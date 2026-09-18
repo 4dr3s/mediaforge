@@ -102,14 +102,16 @@ has no precedent anywhere, including upstream.
   three slices, and the two remaining document pairs (1.4, 1.5) and the verification slice
   (1.6) are still to come. The base stays §1.1's hard-won lesson, the branch point and not the
   previous feature's tip: a range starting at `2a62fa7` would swallow the four `wu3-contract`
-  commits, ancestors of this branch. Slice 1.4, the slice this bullet is being updated by, has no
-  commit yet, so nothing about it is anchored to one: its own lines are counted against the
-  working tree at `c96dd3d` with `git diff --numstat c96dd3d` — raw output and totals in §1.4;
-  that count includes the record's own lines (the §1.1 re-measure mechanism). Slices 1.1–1.3
-  keep their commit anchor (`96f03f6..ad8b122` = 1054, above) and slice 1.3a's own unit keeps its
-  recorded count against `ad8b122` (545, in §1.3a). A commit-anchored total for slice 1.4 would
-  be a claim about a commit that does not exist yet; the anchor here is the working tree until
-  the work unit lands, and then the commit becomes the anchor.
+  commits, ancestors of this branch. Slice 1.4 landed as `64177be`, so it is now commit-anchored
+  like slices 1.1–1.3: `git diff --numstat c96dd3d..64177be` reproduces exactly the slice's recorded
+  working-tree total, 390 (EN=191, ES=199) — raw output and the arithmetic in §1.5. The historical
+  working-tree value (`git diff --numstat c96dd3d`, recorded in §1.4) stays visible and labelled: it
+  read the same 390, and the committed range confirms it line for line. Slice 1.5, the slice this
+  bullet is being updated by, has no commit yet, so nothing about it is anchored to one: its own
+  lines are counted against the working tree at `64177be` with `git diff --numstat 64177be` — raw
+  output and totals in §1.5; that count includes the record's own lines (the §1.1 re-measure
+  mechanism). Slices 1.1–1.3 keep their commit anchor (`96f03f6..ad8b122` = 1054, above) and slice
+  1.3a's own unit keeps its recorded count against `ad8b122` (545, in §1.3a).
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -207,7 +209,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.3 | `repo-hygiene.md` + mirror | `[x]` | §1.3 |
 | 1.3a | Correct the §1.1 formula, re-anchor the running count, record the RDD decision | `[x]` | §1.3a |
 | 1.4 | `s1-foundation.md` + mirror | `[x]` | §1.4 |
-| 1.5 | `wu2-data-model.md` + mirror | `[ ]` | — |
+| 1.5 | `wu2-data-model.md` + mirror | `[x]` | §1.5 |
 | 1.6 | Verification across all 8 documents | `[ ]` | — |
 | 1.7 | Closure | `[ ]` | — |
 
@@ -686,6 +688,289 @@ no commit yet, so its count is the working-tree measurement above (`git diff --n
 which includes this record's own lines. No commit-anchored total is claimed for it — the anchor
 is the working tree until the work unit lands.
 
+### 1.5 — `wu2-data-model.md` and its Spanish mirror (2026-09-17)
+
+The four structures added to both files, and nothing else: task headings kept their text, the
+`## Closure (2026-09-17)` section is untouched, and the Spanish mirror's `cerrada` status token is
+left exactly as it is (finding below, handed to task 1.6). `## Progress` came out fully `[x]` — this
+was the only document whose declared state (`Status: closed`) was already truthful — and `## Next
+step` is an explicit *none*. The TDD bullet in `## Constraints (non-negotiable)` gained the
+mode/source/runner it was missing while keeping its explanatory sentence; verified before writing
+that `openspec/config.yaml:58` is `strict_tdd: true`, that the root `package.json` scripts
+`test:api` (`pnpm --filter api --fail-if-no-match run test`) and `test:worker` (`uv run --project
+workers/media pytest workers/media/tests -q`) run exactly the two commands the line names, and that
+`apps/api/package.json` carries the `test` script (`vitest run`) the API gate resolves to. The
+checks below are the checks task 1.6 will re-run across all eight documents, run here on the four
+files this slice touches, raw:
+
+```text
+$ for f in wu2-data-model.md wu2-data-model.es.md odd-doc-structure.md odd-doc-structure.es.md; do
+    printf '%s: constraints=%s delivery=%s progress=%s next=%s\n' "$f" \
+      "$(grep -c '^## Constraints (non-negotiable)\|^## Restricciones (no negociables)' odd/tasks/$f)" \
+      "$(grep -c '^## Delivery$' odd/tasks/$f)" "$(grep -c '^## Progress$' odd/tasks/$f)" \
+      "$(grep -c '^## Next step$' odd/tasks/$f)"; done
+wu2-data-model.md: constraints=1 delivery=1 progress=1 next=1
+wu2-data-model.es.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.es.md: constraints=1 delivery=1 progress=1 next=1
+```
+
+Every `[x]` in either `## Progress` table resolves to an evidence heading in the same document; the
+section-bounded scan (every `## ` heading resets the guard) and the evidence-heading census are
+below — the census is what makes the bound necessary, because in the wu2 pair the unbounded form
+counts duplicate `### 1.1`–`### 1.3` headings (and a third `### 1.1` from `## Tasks`).
+
+```text
+$ for f in odd/tasks/wu2-data-model.md odd/tasks/wu2-data-model.es.md odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+wu2-data-model.md: §1.1 OK
+wu2-data-model.md: §1.2 OK
+wu2-data-model.md: §1.3 OK
+wu2-data-model.md: §1.4 OK
+wu2-data-model.md: §1.5 OK
+wu2-data-model.md: §1.6 OK
+wu2-data-model.md: §1.7 OK
+wu2-data-model.md: §1.8 OK
+wu2-data-model.es.md: §1.1 OK
+wu2-data-model.es.md: §1.2 OK
+wu2-data-model.es.md: §1.3 OK
+wu2-data-model.es.md: §1.4 OK
+wu2-data-model.es.md: §1.5 OK
+wu2-data-model.es.md: §1.6 OK
+wu2-data-model.es.md: §1.7 OK
+wu2-data-model.es.md: §1.8 OK
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.md: §1.4 OK
+odd-doc-structure.md: §1.5 OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+odd-doc-structure.es.md: §1.4 OK
+odd-doc-structure.es.md: §1.5 OK
+```
+
+All 28 rows resolve: the 16 wu2 rows (EN+ES) and the 12 `[x]` rows of this document's own pair
+(the two `[ ]` rows — 1.6, 1.7 — are untouched by design).
+
+```text
+$ for f in odd/tasks/wu2-data-model.md odd/tasks/wu2-data-model.es.md; do
+    echo "== $f"
+    awk '/^## /{ev=0} /^## Evidence log|^## Registro de evidencia/{ev=1} /^### / && ev{print $2}' "$f" | sort | uniq -c
+  done
+== odd/tasks/wu2-data-model.md
+      2 1.1
+      2 1.2
+      2 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+== odd/tasks/wu2-data-model.es.md
+      2 1.1
+      2 1.2
+      2 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+```
+
+The duplicates are structural, not a resolution problem: tasks 1.1, 1.2 and 1.3 each carry two
+evidence headings — the RED/GREEN run entry plus its *independent verification* entry, a
+consequence of RDD per-work-unit verification — and both headings of a task sit in the same
+`## Evidence log`. The progress pointer resolves by existence (`grep -q "^### <id>"`), so a
+`[x]` pointing at §1.1 finds its evidence. This is a different shape from the `### D1`–`### D4`
+case in `s1-foundation`, where sections *after* the evidence log leaked into an unbounded scan;
+here the only leak would be the duplicates themselves.
+
+The wu2 pair's fenced blocks, byte-identical after this slice's edit (the pair gained exactly one
+new block, the 20-commit list in `## Delivery`):
+
+```text
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu2-data-model.md | md5sum
+9f41d0d28cb00bb828a2ac48773c69b5  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu2-data-model.es.md | md5sum
+9f41d0d28cb00bb828a2ac48773c69b5  -      # identical
+```
+
+**The retrospective Delivery measurement**, the formula of record (additions plus deletions,
+excluding `pnpm-lock.yaml`, `generated` paths and `.lock` files):
+
+```text
+$ git log 1c73e4c..2a62fa7 --numstat | grep -v '^$' | grep -v '^commit ' | grep -v '^Author' | grep -v '^Date' | grep -v '^    ' | awk -v R="1c73e4c..2a62fa7" '$3 !~ /pnpm-lock\.yaml$/ && $3 !~ /generated/ && $3 !~ /\.lock$/ { if ($3 ~ /\.es\.md$/) { addes+=$1+$2; netes+=$1-$2 } else if ($3 ~ /\.md$/) { adden+=$1+$2; neten+=$1-$2 } else { addcode+=$1+$2; netcode+=$1-$2 } } END { printf "=== %s ===\nadd+del total: %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\nnet (add-del): %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\n", R, addcode+adden+addes, addcode, adden, addes, netcode+neten+netes, netcode, neten, netes }'
+=== 1c73e4c..2a62fa7 ===
+add+del total: 4478 (code/tests=2092, Docs EN=1219, Docs ES=1167)
+net (add-del): 3224 (code/tests=1502, Docs EN=865, Docs ES=857)
+```
+
+**Branch facts — why the strategy label is `feature-branch`, retrospective, and not
+`s1-foundation`'s "no branch ever existed":**
+
+```text
+$ git branch -a --list '*wu2-data-model*'
+  feat/wu2-data-model
+  remotes/origin/feat/wu2-data-model
+$ git rev-parse feat/wu2-data-model
+2a62fa7921796028461bad145515a985fc320c78
+$ git rev-parse origin/feat/wu2-data-model
+2a62fa7921796028461bad145515a985fc320c78
+$ git rev-list --left-right --count feat/wu2-data-model...origin/feat/wu2-data-model
+0	0
+$ git merge-base feat/wu2-data-model origin/main
+1c73e4c47be8ffd0e6916992a8023ec7e73d7fe6
+$ git rev-parse --short origin/main
+1c73e4c
+$ git merge-base --is-ancestor 2a62fa7 origin/main && echo merged || echo "2a62fa7 is NOT an ancestor of origin/main"
+2a62fa7 is NOT an ancestor of origin/main
+$ git ls-remote origin 'refs/pull/*/head'; echo "exit=$?"
+exit=0
+```
+
+The feature branch exists locally **and** on `origin`, the two point at the same commit
+(`2a62fa7`) and are in sync (`0\t0`); the branch never merged into `main` (its merge-base with
+`origin/main` is `1c73e4c`, `origin/main`'s tip). The `ls-remote` probe returned empty output with
+exit `0` (no open pull refs). It sees open PRs only — a PR that was opened and closed without
+merging does not show up, so that absence cannot be verified by git alone.
+
+**The 1.4 re-anchor, measured — the check the running-count bullet now rests on:**
+
+```text
+$ git diff --numstat c96dd3d..64177be
+145	3	odd/tasks/odd-doc-structure.es.md
+140	3	odd/tasks/odd-doc-structure.md
+49	2	odd/tasks/s1-foundation.es.md
+47	1	odd/tasks/s1-foundation.md
+```
+
+add+del total: **390 (EN=191, ES=199)** — reproduces §1.4's recorded working-tree total exactly,
+same four files, same numstat. Slice 1.4 is therefore commit-anchored now, like slices 1.1–1.3, and
+its historical working-tree value (`git diff --numstat c96dd3d`, also 390, recorded in §1.4) stays
+visible and labelled. This closes the loop §1.4 left open: "the anchor is the working tree until
+the work unit lands, and then the commit becomes the anchor" — `64177be` is that commit.
+
+**What each document now says that it did not.**
+
+- `wu2-data-model.md`: the TDD line names its mode, source and runner (it was mode-only before:
+  "the config declares `strict_tdd: true`"); `## Delivery` records the retrospective forecast
+  (+4478, measured), the strategy (`feature-branch`, retrospective — the branch exists locally and
+  on `origin`, in sync, never merged into `main`, no open PR) and the slice boundary (one branch,
+  one slice, 20 commits listed verbatim); `## Progress` is fully `[x]` for 1.1–1.8 with a pointer
+  per row; `## Next step` is an explicit *none* naming WU-3 as its own feature.
+- `wu2-data-model.es.md`: the same, translated; the `cerrada` status token untouched (finding
+  below).
+- `odd-doc-structure.md`: task 1.5 is `[x]` (§1.5); the running count re-anchors slice 1.4 to its
+  commit `64177be` (390, reproduced above) and counts this slice against the working tree at
+  `64177be`; `## Next step` names 1.6, then 1.7; and the open items below are recorded for task 1.6
+  instead of being fixed or hidden here.
+
+**Prose proof.** — this unit's diff, measured from the working tree at `64177be` (capture-time
+values; the counts include the record's own lines, the §1.1 re-measure mechanism):
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 318 ++++++++++++++++++++++++++++++++++++--
+ odd/tasks/odd-doc-structure.md    | 305 ++++++++++++++++++++++++++++++++++--
+ odd/tasks/wu2-data-model.es.md    |  75 +++++++++-
+ odd/tasks/wu2-data-model.md       |  71 ++++++++-
+ 4 files changed, 745 insertions(+), 24 deletions(-)
+
+$ git diff --numstat 64177be
+308	10	odd/tasks/odd-doc-structure.es.md
+295	10	odd/tasks/odd-doc-structure.md
+72	3	odd/tasks/wu2-data-model.es.md
+70	1	odd/tasks/wu2-data-model.md
+
+add+del total for this slice: 769 (EN=376, ES=393)
+
+$ git diff --name-only
+odd/tasks/odd-doc-structure.es.md
+odd/tasks/odd-doc-structure.md
+odd/tasks/wu2-data-model.es.md
+odd/tasks/wu2-data-model.md
+```
+
+The working diff touches only the four document files, and a read of the diff, file by file, shows
+each change is one of: the four structures added to the wu2 pair, the TDD bullet completed in its
+`## Constraints` (mode/source/runner added, explanatory sentence kept), or the bookkeeping in this
+document (the `1.5` progress row, the running-count bullet re-anchored, the `## Next step` update,
+and this entry). Nothing else was rewritten.
+
+**On the running count.** Slices 1.1–1.3 stay anchored to their commits (`96f03f6..ad8b122` =
+1054, above), slice 1.3a's own unit keeps its recorded count against `ad8b122` (545), and slice 1.4
+is now re-anchored too — the bullet in `## Delivery` carries the update, and the re-anchor is
+measured just above. This slice has no commit yet, so its count is the working-tree measurement
+(`git diff --numstat 64177be`, in the prose-proof blocks), which includes this record's own lines.
+No commit-anchored total is claimed for it — the anchor is the working tree until the work unit
+lands.
+
+**What surprised me.**
+
+1. **`cerrada` vs `closed`: the one translated status token.** Raw lines of all eight status
+   headers, measured 2026-09-17:
+
+```text
+$ grep -H '^\*\*Status:\*\*' odd/tasks/wu2-data-model.md odd/tasks/s1-foundation.md odd/tasks/repo-hygiene.md odd/tasks/wu3-contract.md
+odd/tasks/wu2-data-model.md:**Status:** `closed` 2026-09-17 — tasks 1.1 to 1.8 complete, every work unit verified independently.
+odd/tasks/s1-foundation.md:**Status:** `closed` — all four tasks 1.1–1.4 carry recorded evidence; the residue list below was
+odd/tasks/repo-hygiene.md:**Status:** complete and pushed (9 commits, `746be7f`…`1c73e4c`, on `origin/main`) — 2026-09-17.
+odd/tasks/wu3-contract.md:**Status:** `in progress` — created 2026-09-17.
+$ grep -H '^\*\*Estado:\*\*' odd/tasks/wu2-data-model.es.md odd/tasks/s1-foundation.es.md odd/tasks/repo-hygiene.es.md odd/tasks/wu3-contract.es.md
+odd/tasks/wu2-data-model.es.md:**Estado:** `cerrada` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
+odd/tasks/s1-foundation.es.md:**Estado:** `closed` — las cuatro tareas 1.1–1.4 llevan evidencia registrada; la lista de
+odd/tasks/repo-hygiene.es.md:**Estado:** completo y pusheado (9 commits, `746be7f`…`1c73e4c`, en `origin/main`) — 2026-09-17.
+odd/tasks/wu3-contract.es.md:**Estado:** `in progress` — creado el 2026-09-17.
+```
+
+   Only the wu2 pair translates the backticked token (`cerrada` against `closed`); `s1-foundation`
+   (`closed`) and `wu3-contract` (`in progress`) keep the English token verbatim, and `repo-hygiene`
+   carries no token (its status is prose, translated normally). This is a real, pre-existing
+   inconsistency. The decision on it belongs to task 1.6, not to this slice, so the mirror keeps
+   `cerrada` exactly as it is; recorded here as an open item for 1.6 with the raw lines above.
+2. **Carried forward from the previous slice's independent verification, left to task 1.6.** Two
+   items, recorded here as open items rather than fixed or hidden:
+   (a) this document's own `## Progress` table rows 1.6 and 1.7 (`[ ]`) carry only a blanket reason
+   — the lead-in sentence, "State is `[x]` only where the evidence log holds observed proof" — not
+   a per-row reason, while task 1.6's spec demands "every `[ ]` has a stated reason";
+   (b) §1.4's residue-closure claim — "closed by the follow-up feature `repo-hygiene` (commit
+   `6fe5314`)" — is stated without raw git output for `6fe5314`. The claim is corroborated by
+   `repo-hygiene.md`'s own slice-boundary list (commit `6fe5314` is "S1 residue closure and mirror
+   regeneration"), but the 1.6 record should carry the raw output or mark the claim unverified.
+3. **The Closure's "eighteen commits, none pushed" does not reproduce — both halves are
+   capture-time claims.** The closure commit `2a62fa7` (the 20th in the range) introduced that
+   sentence. Today the range `1c73e4c..2a62fa7` holds 20 commits (19 at `2a62fa7`'s parent), and
+   the branch is pushed and in sync with `origin` — the delivery the Closure records as pending
+   happened after capture. The count reconciles as 20 minus the tracking commit (`627979d`) and the
+   closure commit (`2a62fa7`), which is plausible but not what the document states. The Closure
+   section is preserved as accepted content; the wu2 `## Delivery` in this slice states the
+   measured truth (20, pushed, in sync); and this discrepancy is recorded as an open item for 1.6.
+4. **No check passed vacuously this slice.** The one probe bounded by construction is the PR probe:
+   `git ls-remote origin 'refs/pull/*/head'` returning empty output with exit `0` is evidence about
+   **open** PRs only, and the wu2 `## Delivery` says exactly that. The pair-hash check on the wu2
+   pair compares real content (the pair gained exactly one new fenced block; the hash now reads
+   `9f41d0d2…`, shared by both files), so this slice's hash pass is not the empty-string pass §1.2
+   recorded for the then-blockless odd-doc-structure pair.
+
+This pair cannot state its own hash inside its own fences without circularity — §1.3a and §1.4
+record the same constraint. Measured at the end of this entry, after the last fenced edit (and
+re-measured after the in-place correction of the prose-proof block above, which is a fenced edit):
+`awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `0521b8fe4b4a0cf37a3d312d2245a44f`,
+and the same command on `odd-doc-structure.es.md` → `0521b8fe4b4a0cf37a3d312d2245a44f` — identical.
+The wu2 pair's hash, quoted in the block above, is unaffected by this document's prose and still
+matches (`9f41d0d2…`). The two prose-proof captures above are capture-time values by design (§1.1's
+re-measure mechanism), and this note adds its own lines on top of them — the committed range
+will confirm the numbers when this work unit lands.
+
 ## RDD conformance
 
 A section because the supervisor made an explicit decision about this feature's candidates on
@@ -725,4 +1010,4 @@ A section because the supervisor made an explicit decision about this feature's 
 
 ## Next step
 
-Run task 1.5 (`wu2-data-model.md` and its Spanish mirror), then the verification in 1.6.
+Run task 1.6 (verification across all 8 documents), then 1.7 (closure).
