@@ -181,18 +181,171 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 
 | ID | Task | State | Evidence |
 | --- | --- | --- | --- |
-| 1.1 | Labels, issue templates, PR template | `[ ]` | — **not closed**: the artifacts do not exist yet |
-| 1.2 | The CI workflow | `[ ]` | — **not closed**: no workflow exists yet |
-| 1.3 | The contributor document | `[ ]` | — **not closed**: no `CONTRIBUTING.md` yet |
-| 1.4 | Regularize PR #1 | `[ ]` | — **not closed**: PR #1 still carries no issue, no label, no template body |
-| 1.5 | Verification and the forecast | `[ ]` | — **not closed**: nothing to verify until 1.1–1.4 land |
-| 1.6 | Closure | `[ ]` | — **not closed**: it is the last task |
+| 1.1 | Labels, issue templates, PR template | `[x]` | §1.1–1.3 |
+| 1.2 | The CI workflow | `[x]` | §1.1–1.3, §1.5 |
+| 1.3 | The contributor document | `[x]` | §1.1–1.3 |
+| 1.4 | Regularize PR #1 | `[x]` | §1.4 |
+| 1.5 | Verification and the forecast | `[x]` | §1.5 |
+| 1.6 | Closure | `[x]` | §1.6, `## Closure` |
 
 ## Evidence log
 
 Raw output, appended as each task closes. Verbatim, not paraphrased.
 
-*(empty — the first entry lands with task 1.1)*
+### 1.1–1.3 — the artifacts, the workflow and the docs (2026-09-18)
+
+Created in one work unit (`8ab9f5e`): the three issue-form YAMLs, the PR template, the four-job
+workflow, and `CONTRIBUTING.md`. Every command the workflow runs was checked against the file that
+defines it, and every YAML was parsed with a real parser:
+
+```text
+$ python3 -c "import yaml,sys; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print('parsed')" \
+    .github/ISSUE_TEMPLATE/*.yml .github/workflows/ci.yml
+parsed
+
+$ grep -E '^  (api|worker|lint|policy):' .github/workflows/ci.yml
+  api:
+  worker:
+  lint:
+  policy:
+
+$ uvx --from ruff==0.16.8 ruff check workers/media
+All checks passed!
+
+$ uvx --from yamllint==1.38.0 yamllint -c .yamllint docker/compose.yaml .yamllint \
+    pnpm-workspace.yaml openspec/config.yaml .github
+  9:1       warning  truthy value should be one of [false, true]  (truthy)   # ci.yml `on:`
+exit=0
+```
+
+**The lint job surfaced a real pre-existing defect, and it was fixed rather than tolerated.**
+`ruff` reported one error on the untouched tree, from the ruleset it enables by default:
+
+```text
+$ uvx --from ruff==0.16.8 ruff check workers/media --output-format=concise   # before the fix
+workers/media/src/mediaforge/contracts.py:77:9: TRY004 Prefer `TypeError` exception for invalid type
+Found 1 error.
+```
+
+`parse_dispatch_envelope` declares `raw: str | bytes` and raised `ValueError` when the argument was
+neither — a **precondition violation**, which Python's own convention (and TRY004) puts under
+`TypeError`, not a rejected document. The fix changes that one branch; every document-level rejection
+still raises `ValueError`, which is what the parity suite asserts. A/B measured, both suites, before
+and after:
+
+```text
+$ uv run --project workers/media pytest workers/media/tests -q     # with the fix
+13 failed, 20 passed in 5.36s
+$ uv run --project workers/media pytest workers/media/tests -q     # reverted to baseline
+13 failed, 20 passed in 4.04s
+```
+
+Identical, and all 13 failures are connection failures (`asyncpg` cannot reach Postgres: Docker is
+not available in this WSL distro), not assertions. The parity suite alone, which is the change's real
+blast radius, is green in both: `19 passed`.
+
+### 1.4 — PR #1 regularized (2026-09-18)
+
+Issue **#2** opened retroactively with `type:chore` and `status:approved`, PR #1 labelled
+`type:feature`, and its body rewritten with the new template. The issue number is **#2, not #1**:
+issues and pull requests share one number space, and PR #1 already occupies `1`.
+
+```text
+$ gh issue view 2 --json number,title,labels --jq '{number,title,labels:[.labels[].name]}'
+{"number":2,"title":"chore(repo): add the delivery policy — PR template, issue templates, and CI",
+ "labels":["type:chore","status:approved"]}
+
+$ gh pr view 1 --json labels,body --jq '{labels:[.labels[].name], closes:(.body|test("Closes #2"))}'
+{"labels":["type:feature"],"closes":true}
+```
+
+Both `policy` rules pass for PR #1 by hand: branch `feat/odd-doc-structure` matches the regex, and
+exactly one `type:*` label is present.
+
+**A structural discovery that changed the plan.** The workflow only runs when it exists on the pull
+request's **head** branch, so PR #1 — whose head was `feat/odd-doc-structure` — could never have had
+CI at all. The branch was fast-forwarded onto this work unit (`3032dbf..59363c2`) rather than left
+without a gate, consistent with the supervisor's earlier decision that PR #1 carries everything.
+
+### 1.5 — verification, and the forecast checked (2026-09-18)
+
+**Half A — the four jobs, on the real PR.** `gh pr checks 1`:
+
+```text
+api     pass    36s
+lint    pass     7s
+policy  pass     2s
+worker  pass    37s
+```
+
+This is also the first real run of the `api` and `worker` suites, which could not run locally: the
+run reported `Tests 1 failed | 42 passed (43)` and `1 failed, 33 passed` **with the scratch failure
+below injected**, so the repository's own suites pass on a clean checkout in CI.
+
+**Half B — the negative control, on a real throwaway branch.** The doctrine is that a gate which
+cannot fail is not a gate (defect D1), so a branch was pushed with one deliberately failing
+assertion in each runtime and no label, and PR #3 opened against `main`. All four jobs failed:
+
+```text
+$ gh pr checks 3
+api     fail    33s
+lint    fail     5s
+policy  fail     5s
+worker  fail    46s
+```
+
+Each with a real reason, from the run logs:
+
+| Job | Observed failure |
+| --- | --- |
+| `api` | `AssertionError: expected 1 to be 2` — `Tests 1 failed \| 42 passed (43)` |
+| `worker` | `assert 1 == 2` — `1 failed, 33 passed in 0.62s` |
+| `lint` | `PLR0133 Two constants compared in a comparison` — `Found 1 error` |
+| `policy` | `rule 1 - exactly one type:* label required, found 0 (none)` **and** `rule 2 - branch "ci-negative-control" does not match /^(feat\|fix\|chore\|docs\|style\|refactor\|perf\|test\|build\|ci\|revert)\/[a-z0-9._-]+$/` |
+
+The `lint` failure was not predicted: the scratch branch added only test files, and `ruff` caught
+`PLR0133` in the Python scratch file. That is the lint job finding a genuine violation in genuine
+code, which is stronger evidence than a synthetic one. PR #3 was then closed unmerged and the branch
+deleted locally and on the remote.
+
+**The forecast, checked.** `## Delivery` forecast **~450** authored lines. Measured:
+
+```text
+$ git diff --numstat 3032dbf..HEAD | awk '{a+=$1;d+=$2} END {printf "add+del=%d\n", a+d}'
+add+del=678
+```
+
+**678** — about **1.5×** the forecast, over 8 files rather than the ~8 predicted (the file count held;
+the per-file size did not). Better than `odd-doc-structure`'s 4.3×, and the same lesson: a forecast is
+a hypothesis, and the honest thing is to print the ratio next to it.
+
+**What surprised me.**
+
+1. **The lint job earned its place on its first run, by finding a real defect in untouched code.**
+   `TRY004` was pre-existing and invisible until a linter was pointed at the tree. The tempting
+   response — add a rule ignore, or drop the job — would have buried it.
+2. **The workflow does not exist for a PR whose head predates it.** That is not a subtlety of this
+   repository; it is how GitHub Actions resolves workflows, and it silently produces a PR with no
+   checks at all. It was found by asking why PR #1 had no CI, not by reading documentation.
+3. **A negative control can find more than the failure it was designed for.** The scratch branch was
+   built to fail `api` and `worker`; `lint` failed on its own, unplanned.
+4. **Issues and PRs share a number space.** The retroactive issue is #2, not #1.
+
+### 1.6 — closure (2026-09-18)
+
+Task 1.6 is the closure: the gates are recorded in `## Closure` above, this document's mirrors are
+regenerated in step, and the feature closes with its residue and open decisions listed there. The
+closure is dated 2026-09-18 because that is when it was written — every earlier entry in this
+document carries the same date, and no accepted date was changed.
+
+```text
+$ git log --oneline 3032dbf..HEAD
+59363c2 fix(docs): correct two citations and the issue number in the policy docs
+8ab9f5e feat(ci): delivery policy — templates, four CI gates, docs
+
+$ git diff --numstat 3032dbf..HEAD | awk '{a+=$1;d+=$2} END {printf "add+del=%d\n", a+d}'
+add+del=678
+```
 
 ## Out of scope
 
@@ -207,8 +360,59 @@ Raw output, appended as each task closes. Verbatim, not paraphrased.
   needed by the policy chosen.
 - **Rewriting history, or rewriting PR #1's commits.** Only its metadata and body are regularized.
 
+## Closure (2026-09-18)
+
+**What shipped.** The repository's delivery policy, in one work unit (`8ab9f5e`) plus one correction
+(`59363c2`): two issue forms and their config, a PR template, a four-job CI workflow, `CONTRIBUTING.md`,
+and one source fix the lint job surfaced (`contracts.py` now raises `TypeError` for a precondition
+violation). Seven labels were created on the remote.
+
+**The gates, as they stand**, all four green on PR #1 and all four demonstrated **failing** on a real
+throwaway branch (PR #3):
+
+```text
+api     pass 36s      |  negative control: fail (AssertionError, 1 failed | 42 passed)
+worker  pass 37s      |  negative control: fail (assert 1 == 2, 1 failed, 33 passed)
+lint    pass  7s      |  negative control: fail (PLR0133, Found 1 error)
+policy  pass  2s      |  negative control: fail (both rules: 0 type:* labels, bad branch name)
+```
+
+**The policy, as enforced.** Exactly one `type:*` label, and a head branch matching the type regex.
+Issue linkage is optional — the supervisor's decision, and the `policy` job implements exactly those
+two rules and no third.
+
+**The forecast, settled.** ~450 predicted, **678** measured (1.5×), over 8 files. Stated next to the
+forecast rather than replacing it.
+
+**Residue.** None in this feature's own artifacts. Three deliberate omissions, each stated in
+`CONTRIBUTING.md` so the gap is visible rather than an oversight: no `shellcheck` (zero shell scripts
+in the repository — the check would pass over an empty set), no `eslint` and no `prettier` (neither is
+installed or configured; adding a linter the team has not chosen is a separate decision). `knip`
+stays unevaluated-by-design, as `repo-hygiene.md` §1.6 recorded.
+
+**What this feature does not do.** It does not make the four jobs *required*: that is a repository
+setting, and it is the supervisor's to enable now that the jobs have run green at least once. It adds
+no branch protection, no CODEOWNERS, no dependabot, no release automation. It does not retrofit the
+policy onto the commits that already landed — they predate it, and rewriting them would be
+misinformation.
+
+**What measurement changed on the way.** The lint job found a real pre-existing defect in untouched
+code (`TRY004`) and it was fixed rather than ignored; the workflow's non-existence for PR #1's original
+head forced a fast-forward, because a PR whose head predates the workflow silently has no checks at
+all; and the negative control found one failure it was not designed for (`lint` failing on a scratch
+Python file).
+
+**RDD conformance.** No native review ran for this feature's candidates: it is configuration, YAML,
+Markdown and one four-line source fix, and the supervisor's standing decision for documentation-shaped
+work applies. What carries the check instead is the verification battery above — every job demonstrated
+able to fail on a real branch, not on a claim.
+
+**Next.** Task 1.6 closes this feature. The next work unit is `wu3-contract`'s unapplied verifier fix
+plan (F1, F2, F3); the supervisor separately owns enabling the required-status-check setting and
+closing PR #1.
+
 ## Next step
 
-Run task 1.1 — create the labels, the issue templates and the PR template — then 1.2 (the workflow),
-1.3 (the contributor document), 1.4 (regularize PR #1), 1.5 (verification with negative controls) and
-1.6 (closure).
+Run task 1.6 — the closure — then this feature is done and the only open thread is `wu3-contract`'s
+unapplied verifier fix plan (F1, F2, F3), whose task 1.4 is the only `[ ]` left across the 8 documents
+of the previous feature.
