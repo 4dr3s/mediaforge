@@ -50,8 +50,10 @@ paridad y no un archivo de schema que se ve bien.
 - **Dos validadores, un único set de fixtures.** El test de paridad es el mecanismo que mantiene
   honestos a zod y a pydantic. Un fixture que solo un lado parsea es un test que falla, no uno que se
   saltea.
-- **Strict TDD.** `openspec/config.yaml` declara `strict_tdd: true`: las dos suites se escriben y se
-  observan fallando antes de que existan los archivos del contrato.
+- **Strict TDD.** Modo `strict`; fuente `openspec/config.yaml:58` (`strict_tdd: true`); runner las dos
+  gates: `pnpm --filter api --fail-if-no-match run test` (api) y
+  `uv run --project workers/media pytest workers/media/tests -q` (worker). Las dos suites se escriben y
+  se observan fallando antes de que existan los archivos del contrato.
 - **El RDD sigue prendido**, con el verificador independiente por unidad de trabajo, como en WU-2.
 
 ## Decisiones tomadas antes de escribir
@@ -67,6 +69,21 @@ paridad y no un archivo de schema que se ve bien.
 3. **Las suites de paridad están separadas del E2E.** El escenario de C3 sobre bytes reales es el
    smoke de compose (WU-21). WU-3 prueba que los dos validadores coinciden sobre los mismos
    documentos; WU-21 prueba que los dos procesos coinciden sobre unos reales.
+
+## Delivery
+
+Registrado el 2026-09-17, cuando esta estructura se agregó al documento. Los números se miden
+retrospectivamente desde los commits, no se estimaron en la creación — esta feature es anterior al
+campo.
+
+- **Estrategia:** `single-pr` (retrospectiva; el campo no existía cuando se planificó el trabajo).
+- **Forecast:** +1572 líneas autoradas cambiadas (adiciones más deleciones, lockfiles y archivos
+  generados excluidos) — +1002 de código y tests, +284 de documentación en inglés, +286 de espejo en
+  español. Eso es ~3,9× el presupuesto advisory de ~400, sin cadena aplicada.
+- **Fronteras de slice:** ninguna, porque no se usó ninguna. El trabajo está en una sola branch local,
+  `feat/wu3-contract`, sin upstream y sin pull request, con `e806a4f` (rastreo), `0220b84` (las dos
+  suites de paridad), `7b432f6` (el contrato, el registry y los dos validadores) y `96f03f6` (el
+  espejo español y el registro de verificación).
 
 ## Tareas
 
@@ -128,6 +145,23 @@ información nueva para el log.
 `contracts/README.md` y el documento de la feature coinciden con lo que existe; la copia `.es.md` se
 genera y se verifica (bloques de código idénticos byte a byte); la feature se cierra con sus gates
 registradas.
+
+## Progress
+
+El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada de esa tarea. El tier y
+el resultado de RDD por unidad de trabajo viven en el registro de evidencia, donde se registraron a
+medida que el trabajo corría.
+
+| ID | Tarea | Estado | Evidencia |
+| --- | --- | --- | --- |
+| 1.1 | RED: las dos suites de paridad | `[x]` | §1.1 |
+| 1.2 | GREEN: el contrato, el registry, los fixtures y los dos validadores | `[x]` | §1.2 |
+| 1.3 | Conformidad con el RDD, por unidad de trabajo | `[x]` | §1.3 |
+| 1.4 | Cierre | `[ ]` | — **no cerrada**: el plan de fixes del verificador (F1, F2, F3, §1.3) está sin aplicar |
+
+La tarea 1.3 está `[x]` porque la verificación que pide *corrió* y sus refutaciones están registradas;
+no es una afirmación de que la feature esté sana. Lo que refutó es la razón por la que 1.4 sigue
+abierta.
 
 ## Registro de evidencia
 
@@ -284,3 +318,15 @@ aplicar:
   agregar después; v0.1 entrega una.
 - Agregar un tipo de job distinto de `audio.extract`. El registry está formado para más, y los
   fixtures deliberadamente no inventan uno.
+
+## Next step
+
+Aplicar el plan de fixes del verificador registrado en §1.3 antes de cerrar — **F1** (afirmar la
+semántica del schema en las dos suites: `additionalProperties: false`, el `const` de versión,
+`format: date-time`, exactamente tres propiedades), **F2** (validación de fecha con conocimiento de
+calendario del lado de Python en lugar del regex, más los cuatro fixtures faltantes: fecha imposible,
+mes inválido, un 29 de febrero de año no bisiesto y un offset de `+24:00`) y **F3** (reducir el scan de
+vocabulario a tokens específicos de Redis e incluir los dos módulos de validadores). La tarea 1.4 queda
+`[ ]` hasta que eso aterrice. Medido el 2026-09-17: F2 no está aplicado — los cuatro fixtures están
+ausentes de `contracts/fixtures/envelopes/invalid/` y `workers/media/src/mediaforge/contracts.py` no
+contiene `datetime`, `date(` ni `fromisoformat`.

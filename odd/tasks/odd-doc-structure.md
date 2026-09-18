@@ -162,7 +162,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | ID | Task | State | Evidence |
 | --- | --- | --- | --- |
 | 1.1 | The uniform shape and the measured facts | `[x]` | §1.1 |
-| 1.2 | `wu3-contract.md` + mirror | `[ ]` | — |
+| 1.2 | `wu3-contract.md` + mirror | `[x]` | §1.2 |
 | 1.3 | `repo-hygiene.md` + mirror | `[ ]` | — |
 | 1.4 | `s1-foundation.md` + mirror | `[ ]` | — |
 | 1.5 | `wu2-data-model.md` + mirror | `[ ]` | — |
@@ -210,6 +210,37 @@ are absent from `contracts/fixtures/envelopes/invalid/` (present: `date-only`, `
 `workers/media/src/mediaforge/contracts.py` contains no `datetime`, `date(` or `fromisoformat` — so the
 calendar-aware validation F2 asks for is not there.
 
+### 1.2 — `wu3-contract.md` and its Spanish mirror (2026-09-17)
+
+The structures added, and the checks that were actually run:
+
+```text
+$ for f in wu3-contract.md wu3-contract.es.md; do
+    echo "$f: $(grep -c '^## Delivery\|^## Progress\|^## Next step' $f) sections, TDD source: $(grep -c 'source `openspec' $f)"; done
+wu3-contract.md: 3 sections, TDD source: 1
+wu3-contract.es.md: 3 sections, TDD source: 1
+
+$ blocks() { awk '/^```/{f=!f; print; next} f{print}' "$1" | md5sum; }
+$ blocks wu3-contract.md && blocks wu3-contract.es.md
+5164754a97cd612023d3ffb28522a9c8
+5164754a97cd612023d3ffb28522a9c8      # identical
+```
+
+**One check passed vacuously, and it is recorded instead of hidden.** Run on this feature's own pair,
+the same comparison returns `d41d8cd98f00b204e9800998ecf8427e` — the MD5 of the empty string — because
+`odd-doc-structure.md` has no fenced code block at all. The mirror rule holds there trivially, so the
+check cannot fail for that pair and proves nothing about it. That is the same class as this repository's
+own recorded defect D1 (*"a gate that cannot fail"*): a check passing for a reason unrelated to what it
+claims. Task 1.6 must therefore *demonstrate* the check failing on a constructed counter-example before
+any pass of it is worth anything — and it must re-measure this pair too, because this evidence entry is
+what gives the pair its first fenced block.
+
+**What the document now says that it did not.** Task 1.4 (Closure) is `[ ]`, and `## Next step` names
+the verifier's unapplied fix plan — measured, not inferred, as §1.1 records. The Delivery block records
+the slice boundary as *"none, because none were used"*: `feat/wu3-contract` has no upstream and no pull
+request, and sits 24 commits past `origin/main` (a count that includes `wu2-data-model`, because the
+history is stacked).
+
 ## Out of scope
 
 - The upstream fix. The supervisor decided (2026-09-17) not to file an issue against
@@ -223,4 +254,4 @@ calendar-aware validation F2 asks for is not there.
 
 ## Next step
 
-Answer the chain-strategy question recorded in `## Delivery`, then run task 1.2.
+Run task 1.3 (`repo-hygiene.md` and its Spanish mirror), then 1.4, 1.5, and the verification in 1.6.

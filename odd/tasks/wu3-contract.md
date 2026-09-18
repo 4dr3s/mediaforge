@@ -46,8 +46,10 @@ not a schema file that looks right.
   duplicated as a constant in either runtime, and the tests read the values from the file.
 - **Two validators, one fixture set.** The parity test is the mechanism that keeps zod and pydantic
   honest. A fixture that only one side parses is a failing test, not a skipped one.
-- **Strict TDD.** `openspec/config.yaml` declares `strict_tdd: true`: the two suites are written and
-  observed failing before the contract files exist.
+- **Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the
+  two gates: `pnpm --filter api --fail-if-no-match run test` (api) and
+  `uv run --project workers/media pytest workers/media/tests -q` (worker). The two suites are written
+  and observed failing before the contract files exist.
 - **RDD stays on**, with the per-work-unit independent verifier, as in WU-2.
 
 ## Decisions taken before writing
@@ -63,6 +65,20 @@ not a schema file that looks right.
 3. **The parity suites are separate from the E2E.** C3's scenario about real bytes is the compose
    smoke (WU-21). WU-3 proves the two validators agree on the same documents; WU-21 proves the two
    processes agree on real ones.
+
+## Delivery
+
+Recorded 2026-09-17, when this structure was added to the document. The numbers are measured
+retrospectively from the commits, not estimated at creation — this feature predates the field.
+
+- **Strategy:** `single-pr` (retrospective; the field did not exist when the work was planned).
+- **Forecast:** +1572 authored changed lines (additions plus deletions, lockfiles and generated files
+  excluded) — +1002 code and tests, +284 English documentation, +286 Spanish mirror. That is ~3.9× the
+  ~400 advisory budget, with no chain applied.
+- **Slice boundaries:** none, because none were used. The work sits on one local branch,
+  `feat/wu3-contract`, with no upstream and no pull request, holding `e806a4f` (tracking), `0220b84`
+  (the two parity suites), `7b432f6` (the contract, the registry and both validators) and `96f03f6`
+  (the Spanish mirror and the verification record).
 
 ## Tasks
 
@@ -121,6 +137,21 @@ independent verifier. The expected tier is `unassessable`-as-high for candidates
 
 `contracts/README.md` and the feature doc agree with what exists; the `.es.md` copy is generated and
 verified (code blocks byte-identical); the feature is closed with its gates recorded.
+
+## Progress
+
+State is `[x]` only where the evidence log holds observed proof for that task. The RDD tier and
+outcome per work unit live in the evidence log, where they were recorded as the work ran.
+
+| ID | Task | State | Evidence |
+| --- | --- | --- | --- |
+| 1.1 | RED: the two parity suites | `[x]` | §1.1 |
+| 1.2 | GREEN: the contract, the registry, the fixtures and the two validators | `[x]` | §1.2 |
+| 1.3 | RDD conformance, per work unit | `[x]` | §1.3 |
+| 1.4 | Closure | `[ ]` | — **not closed**: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
+
+Task 1.3 is `[x]` because the verification it asks for *ran* and its refutations are recorded; it is
+not a statement that the feature is sound. What it refuted is the reason 1.4 stays open.
 
 ## Evidence log
 
@@ -271,3 +302,14 @@ merely by a post-parse key check; the numeric limits duplicated nowhere but the 
   ships one.
 - Adding a job type other than `audio.extract`. The registry is shaped for more, and the fixtures
   deliberately do not invent one.
+
+## Next step
+
+Apply the verifier's fix plan recorded in §1.3 before closing — **F1** (assert the schema's semantics
+in both suites: `additionalProperties: false`, the version `const`, `format: date-time`, exactly three
+properties), **F2** (calendar-aware date validation on the Python side in place of the regex, plus
+the four missing fixtures: impossible date, invalid month, a non-leap February 29th and a `+24:00`
+offset) and **F3** (narrow the vocabulary scan to Redis-specific tokens and include both validator
+modules). Task 1.4 stays `[ ]` until they land. Measured 2026-09-17: F2 is not applied — the four
+fixtures are absent from `contracts/fixtures/envelopes/invalid/` and
+`workers/media/src/mediaforge/contracts.py` contains no `datetime`, `date(` or `fromisoformat`.

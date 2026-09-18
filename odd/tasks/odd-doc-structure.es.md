@@ -219,6 +219,38 @@ que F2 exige están ausentes de `contracts/fixtures/envelopes/invalid/` (present
 `unsupported-version`), y `workers/media/src/mediaforge/contracts.py` no contiene `datetime`, `date(`
 ni `fromisoformat` — así que la validación con conocimiento de calendario que F2 pide no está.
 
+### 1.2 — `wu3-contract.md` y su espejo español (2026-09-17)
+
+Las estructuras agregadas, y los checks que efectivamente se corrieron:
+
+```text
+$ for f in wu3-contract.md wu3-contract.es.md; do
+    echo "$f: $(grep -c '^## Delivery\|^## Progress\|^## Next step' $f) sections, TDD source: $(grep -c 'source `openspec' $f)"; done
+wu3-contract.md: 3 sections, TDD source: 1
+wu3-contract.es.md: 3 sections, TDD source: 1
+
+$ blocks() { awk '/^```/{f=!f; print; next} f{print}' "$1" | md5sum; }
+$ blocks wu3-contract.md && blocks wu3-contract.es.md
+5164754a97cd612023d3ffb28522a9c8
+5164754a97cd612023d3ffb28522a9c8      # identical
+```
+
+**Un check pasó de forma vacua, y se registra en vez de esconderse.** Corrida sobre el par de esta
+misma feature, la misma comparación devuelve `d41d8cd98f00b204e9800998ecf8427e` — el MD5 de la cadena
+vacía — porque `odd-doc-structure.md` no tiene ningún bloque de código cercado. La regla del espejo se
+cumple ahí de forma trivial, así que el check no puede fallar para ese par y no prueba nada sobre él.
+Es la misma clase que el defecto D1 ya registrado en este repo (*"una gate que no puede fallar"*): un
+check que pasa por una razón ajena a lo que afirma. Por eso la tarea 1.6 tiene que *demostrar* que el
+check falla sobre un contraejemplo construido, antes de que cualquier pase suyo valga algo — y tiene
+que re-medir este par también, porque esta entrada de evidencia es la que le da al par su primer
+bloque cercado.
+
+**Lo que el documento ahora dice y antes no.** La tarea 1.4 (Cierre) está `[ ]`, y `## Next step`
+nombra el plan de fixes sin aplicar del verificador — medido, no inferido, como registra el §1.1. El
+bloque de Delivery registra la frontera de slice como *"ninguna, porque no se usó ninguna"*:
+`feat/wu3-contract` no tiene upstream ni pull request, y está 24 commits por delante de `origin/main`
+(un conteo que incluye `wu2-data-model`, porque la historia está apilada).
+
 ## Fuera de alcance
 
 - El fix upstream. El supervisor decidió (2026-09-17) no levantar un issue contra
