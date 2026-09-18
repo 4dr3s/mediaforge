@@ -88,14 +88,21 @@ has no precedent anywhere, including upstream.
 - **Forecast:** ~750 authored changed lines (additions plus deletions, generated files and lockfiles
   excluded) across 8 documents, 4 English plus 4 Spanish mirrors acting as a single unit each.
   Measured basis: the additions per document are 4 structures × ~15–20 lines, doubled by the mirror.
-- **Running count:** 1054 authored changed lines across slices 1.1, 1.2 and 1.3 together,
-  measured from the feature branch base `96f03f6` with `git diff --numstat 96f03f6` (the
-  uncommitted slice 1.3 edits included, this bullet's own lines among them): 515 in the English
-  documents and 539 in their Spanish mirrors, so the mirrors are again ~51% of the cost. This is
-  additions plus deletions, the one formula the supervisor settled on 2026-09-17; §1.1's four
-  per-feature totals are *net* instead, which is the defect recorded below and corrected in 1.3a.
-  The base is §1.1's hard-won lesson, the branch point and not the previous feature's tip: a range
-  starting at `2a62fa7` would swallow the four `wu3-contract` commits, ancestors of this branch.
+- **Running count:** slices 1.1, 1.2 and 1.3 together measure **1054** authored changed lines,
+  additions plus deletions — the one formula the supervisor settled on 2026-09-17 — anchored to
+  **commits** and measured with `git diff --numstat 96f03f6..ad8b122`: 515 in the English
+  documents and 539 in their Spanish mirrors, so the mirrors are again ~51% of the cost.
+  Re-anchored in 1.3a (2026-09-17): the previous bullet measured the working tree (`git diff
+  --numstat 96f03f6`) and so included its own lines and moved with every later edit; slice 1.3
+  is now committed as `ad8b122`, and a count anchored to commits cannot be invalidated by the
+  act of writing it down. This work unit (1.3a) adds its own authored changed lines on top,
+  counted separately against the working tree with `git diff --numstat ad8b122` — raw output
+  and totals in §1.3a; that count includes the record's own lines (the §1.1 re-measure
+  mechanism). The ~750-line forecast does not hold: 1054 is already measured across the first
+  three slices, and the two remaining document pairs (1.4, 1.5) and the verification slice
+  (1.6) are still to come. The base stays §1.1's hard-won lesson, the branch point and not the
+  previous feature's tip: a range starting at `2a62fa7` would swallow the four `wu3-contract`
+  commits, ancestors of this branch.
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -130,6 +137,26 @@ the next action, because that is what the document currently does not say.
 
 Add the four structures, correct the `Status` line that currently contradicts the pushed slice, and
 leave **1.6 at `[ ]`** with the reason: no evidence section, trace only in finding F5.
+
+### 1.3a — Correct the forecast formula to additions plus deletions, and record the RDD conformance decision · owner: AI
+
+Two supervisor decisions, taken 2026-09-17 (the day this feature was created), applied here:
+
+- **One forecast formula.** The single formula is additions plus deletions. §1.1's four
+  per-feature totals were *net* (additions minus deletions) and are corrected, keeping the old
+  net figures visible and labelled; `wu3-contract.md` `## Delivery` carries the same correction.
+- **Re-anchored running count.** Slices 1.1–1.3 are measured from commits (`git diff --numstat
+  96f03f6..ad8b122`), because the working-tree measurement included the bullet's own lines and
+  moved with every edit. This work unit's own lines are counted separately.
+- **The RDD decision.** The supervisor opted out of native review for this feature's candidates,
+  explicitly and informed, on the review entry rule's documentation-only passive edit exception,
+  with in-repo precedent in `repo-hygiene.md` §1.8. The outcome is recorded in the new
+  `## RDD conformance` section; task 1.6's mechanical verification carries the check instead.
+
+**Acceptance:** every corrected number is measured and its raw output is in §1.3a; no corrected
+number replaces an old one without the old figure staying visible and labelled; the `.es.md`
+mirrors are regenerated in step; and the RDD record names the outcome, its scope, and what the
+feature carries instead.
 
 ### 1.4 — `s1-foundation.md` and its Spanish mirror · owner: AI
 
@@ -171,6 +198,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.1 | The uniform shape and the measured facts | `[x]` | §1.1 |
 | 1.2 | `wu3-contract.md` + mirror | `[x]` | §1.2 |
 | 1.3 | `repo-hygiene.md` + mirror | `[x]` | §1.3 |
+| 1.3a | Correct the §1.1 formula, re-anchor the running count, record the RDD decision | `[x]` | §1.3a |
 | 1.4 | `s1-foundation.md` + mirror | `[ ]` | — |
 | 1.5 | `wu2-data-model.md` + mirror | `[ ]` | — |
 | 1.6 | Verification across all 8 documents | `[ ]` | — |
@@ -185,14 +213,26 @@ Raw output, appended as each task closes. Verbatim, not paraphrased.
 Per-feature authored changed lines, measured with `git log <range> --numstat`, additions plus
 deletions, excluding `pnpm-lock.yaml`, `generated` paths and `.lock` files:
 
-| Feature | Range | Total | Code/tests | Docs EN | Docs ES |
-| --- | --- | --- | --- | --- | --- |
-| `s1-foundation` | `b05afcd..9eb288b` | +1930 | +666 | +642 | +622 |
-| `repo-hygiene` | `9eb288b..1c73e4c` | +951 | +20 | +459 | +472 |
-| `wu2-data-model` | `1c73e4c..2a62fa7` | +3224 | +1502 | +865 | +857 |
-| `wu3-contract` | `2a62fa7..96f03f6` | +1572 | +1002 | +284 | +286 |
+| Feature | Range | Total (add+del) | Code/tests | Docs EN | Docs ES | Old total (net) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `s1-foundation` | `b05afcd..9eb288b` | +1934 | +666 | +644 | +624 | +1930 |
+| `repo-hygiene` | `9eb288b..1c73e4c` | +1163 | +20 | +585 | +558 | +951 |
+| `wu2-data-model` | `1c73e4c..2a62fa7` | +4478 | +2092 | +1219 | +1167 | +3224 |
+| `wu3-contract` | `2a62fa7..96f03f6` | +1598 | +1004 | +308 | +286 | +1572 |
 
-Every feature exceeds the ~400-line advisory budget, by 2.4× to 8×. In three of four, the Spanish
+**Corrected in 1.3a, 2026-09-17.** The four rows above were originally *net* totals (additions
+minus deletions) — +1930 = +666/+642/+622, +951 = +20/+459/+472, +3224 = +1502/+865/+857,
++1572 = +1002/+284/+286 — contradicting the formula sentence above them. The supervisor settled
+2026-09-17 on one formula, **additions plus deletions**, and the rows were re-measured from the
+commits with `git log <range> --numstat` (both formulas, raw output in §1.3a): +1934 =
++666/+644/+624, +1163 = +20/+585/+558, +4478 = +2092/+1219/+1167, +1598 = +1004/+308/+286.
+The old net figures stay visible: the `Old total (net)` column, and in full in the sentence
+above as the historical measurement. Other numbers in this section that were measured at the
+time are left as written evidence (the trap paragraph's +2106/+450/+454 and the share figures in
+task 1.1's text); the mirror-share claim holds under both formulas, ~49% of each pair's
+documentation lines.
+
+Every feature exceeds the ~400-line advisory budget, by 2.9× to 11.2×. In three of four, the Spanish
 mirror alone is at or above the whole budget, and no document records that cost.
 
 The four structures' absence, measured across the 4 English documents:
@@ -326,7 +366,11 @@ feature branch base, uncommitted slice 1.3 edits included) reads 1054 authored c
 515 in the English documents and 539 in their Spanish mirrors, so the mirrors are again ~51% of
 the cost. It is additions plus deletions, which is now the single formula in this document; §1.1's
 four totals are net, and unifying them is task 1.3a. Re-measuring after writing is the §1.1
-mechanism, so the total includes this section's own lines.
+mechanism, so the total includes this section's own lines. *(Consistency note, 1.3a,
+2026-09-17: 1054 was the working-tree measurement, captured before the commit and including the
+lines that state it. Slice 1.3 has since landed as `ad8b122`, and the commit-anchored range
+`git diff --numstat 96f03f6..ad8b122` reproduces exactly 1054 — the arithmetic is in §1.3a —
+so the historical value survives unchanged while 1.3a re-anchors the bullet to commits.)*
 
 **What surprised me.**
 
@@ -337,7 +381,10 @@ mechanism, so the total includes this section's own lines.
    s1-foundation.md, s1-foundation.es.md, .gitattributes, package.json, Makefile, and the SDD
    `tasks.md` bucketed into the English docs). §1.1's arithmetic contradicts its own formula
    sentence; the corrected forecast (additions plus deletions) is recorded in `repo-hygiene.md`
-   `## Delivery`, and §1.1's row is left untouched as accepted evidence.
+   `## Delivery`, and §1.1's row is left untouched as accepted evidence. *(Superseded in 1.3a,
+   2026-09-17: the supervisor settled the one formula as additions plus deletions, and §1.1's
+   four rows were corrected with the old net figures kept visible and labelled, in place of
+   "left untouched"; see §1.1 and §1.3a.)*
 2. **The Spanish mirror of this document had drifted before this slice.** `odd-doc-structure.es.md`
    `## Progress` row 1.2 read `[ ]` while the canonical English table read `[x]` (§1.2 evidence
    exists in both files). Caught while regenerating the mirror here; corrected to match the
@@ -356,6 +403,178 @@ output and the decision not to act, F5 the raw knip output and the deferred `uv`
 task body above keeps its original text; the overrule is recorded here and, as an evidence
 section, in the overruled document itself.
 
+### 1.3a — the formula correction, the re-anchored count and the RDD record (2026-09-17)
+
+Everything in this section comes from a command, and every number is a measured value; where the
+original was deliberately preserved as written evidence, that is stated and not hidden. The
+supervisor's dictated add+del totals and category splits reproduced exactly — nothing was corrected
+back to the parent. The only disagreement found was my own first awk run, which printed the per-
+category net split wrong (the net accumulators sat outside the category branch, so each column
+printed the total); the corrected run below is the record.
+
+**Check 1 — the per-feature re-measurement, both formulas.** Same ranges, same exclusions
+(`pnpm-lock.yaml`, `generated` paths, `.lock` files; `migration_lock.toml` is a `.toml`, not a
+`.lock` file, and counts as code/tests):
+
+```text
+$ for r in "b05afcd..9eb288b" "9eb288b..1c73e4c" "1c73e4c..2a62fa7" "2a62fa7..96f03f6"; do git log "$r" --numstat | grep -v '^$' | grep -v '^commit ' | grep -v '^Author' | grep -v '^Date' | grep -v '^    ' | awk -v R="$r" '$3 !~ /pnpm-lock\.yaml$/ && $3 !~ /generated/ && $3 !~ /\.lock$/ { if ($3 ~ /\.es\.md$/) { addes+=$1+$2; netes+=$1-$2 } else if ($3 ~ /\.md$/) { adden+=$1+$2; neten+=$1-$2 } else { addcode+=$1+$2; netcode+=$1-$2 } } END { printf "=== %s ===\nadd+del total: %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\nnet (add-del): %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\n", R, addcode+adden+addes, addcode, adden, addes, netcode+neten+netes, netcode, neten, netes }'; done
+=== b05afcd..9eb288b ===
+add+del total: 1934 (code/tests=666, Docs EN=644, Docs ES=624)
+net (add-del): 1930 (code/tests=666, Docs EN=642, Docs ES=622)
+=== 9eb288b..1c73e4c ===
+add+del total: 1163 (code/tests=20, Docs EN=585, Docs ES=558)
+net (add-del): 951 (code/tests=20, Docs EN=459, Docs ES=472)
+=== 1c73e4c..2a62fa7 ===
+add+del total: 4478 (code/tests=2092, Docs EN=1219, Docs ES=1167)
+net (add-del): 3224 (code/tests=1502, Docs EN=865, Docs ES=857)
+=== 2a62fa7..96f03f6 ===
+add+del total: 1598 (code/tests=1004, Docs EN=308, Docs ES=286)
+net (add-del): 1572 (code/tests=1002, Docs EN=284, Docs ES=286)
+```
+
+The add+del column is what §1.1's table now carries; the net column is the old measurement
+(`Old total (net)`). The net splits reproduce the old rows exactly — 666/642/622, 20/459/472,
+1502/865/857, 1002/284/286.
+
+**Check 2 — `##` heading count, EN vs ES, both pairs:**
+
+```text
+$ for p in odd-doc-structure wu3-contract; do printf '%s: EN=%s ES=%s\n' "$p" "$(grep -c '^## ' odd/tasks/$p.md)" "$(grep -c '^## ' odd/tasks/$p.es.md)"; done
+odd-doc-structure: EN=10 ES=10
+wu3-contract: EN=10 ES=10
+```
+
+**Check 3 — fenced code blocks byte-identical, both pairs.** The wu3 pair, which this record does
+not touch inside its fences:
+
+```text
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu3-contract.md | md5sum
+6e58b62bedfa054f43d9a83cdb1ce708  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu3-contract.es.md | md5sum
+6e58b62bedfa054f43d9a83cdb1ce708  -      # identical
+```
+
+The pair that contains these very lines cannot state its own hash inside itself without
+circularity, so it is measured separately, in prose: `awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `f8dd5e327a4391e76ec58d9c557b24be`, and the same command on `odd-doc-structure.es.md` → `f8dd5e327a4391e76ec58d9c557b24be` — identical.
+
+**Check 4 — every `[x]` in `## Progress` resolves to a heading in the same document:**
+
+```text
+$ for f in odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md odd/tasks/wu3-contract.md odd/tasks/wu3-contract.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+wu3-contract.md: §1.1 OK
+wu3-contract.md: §1.2 OK
+wu3-contract.md: §1.3 OK
+wu3-contract.es.md: §1.1 OK
+wu3-contract.es.md: §1.2 OK
+wu3-contract.es.md: §1.3 OK
+```
+
+**Check 5 — the diff of this work unit.** `git diff --stat` and the unit's own numstat, measured
+after everything in this section was written (the counts include this section's own lines):
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 266 +++++++++++++++++++++++++++++++++++---
+ odd/tasks/odd-doc-structure.md    | 257 +++++++++++++++++++++++++++++++++---
+ odd/tasks/wu3-contract.es.md      |  11 +-
+ odd/tasks/wu3-contract.md         |  11 +-
+ 4 files changed, 501 insertions(+), 44 deletions(-)
+```
+
+A read of the diff, file by file: `odd-doc-structure.md` — the running-count bullet replaced
+(re-anchored to commits), §1.1's table corrected with the new `Old total (net)` column and a
+labelled correction note, the derived multiplier sentence corrected (2.9× to 11.2×), two labelled
+notes appended to §1.3 (consistency + supersede), the new task 1.3a, the new `## Progress` row,
+the new `## RDD conformance` section, the new `### 1.3a` evidence entry, and the one-line
+`## Next step` update; `odd-doc-structure.es.md` — the same changes, translated; `wu3-contract.md`
+and its mirror — only the `## Delivery` `**Forecast:**` bullet, corrected with the old +1572 set
+kept and labelled. No other lines changed. The unit's own authored lines, from the working tree:
+
+```text
+$ git diff --numstat ad8b122
+247	19	odd/tasks/odd-doc-structure.es.md
+238	19	odd/tasks/odd-doc-structure.md
+8	3	odd/tasks/wu3-contract.es.md
+8	3	odd/tasks/wu3-contract.md
+
+add+del total for this unit: 545 (EN=268, ES=277)
+```
+
+**Slices 1.1–1.3, anchored to commits (Decision 2):**
+
+```text
+$ git diff --numstat 96f03f6..ad8b122
+384	0	odd/tasks/odd-doc-structure.es.md
+372	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	3	odd/tasks/wu3-contract.es.md
+44	2	odd/tasks/wu3-contract.md
+```
+
+add+del total: **1054** (515 English, 539 Spanish). A commit-anchored count cannot be invalidated
+by the act of writing it down, which is why the bullet now rests on this range instead of on the
+working tree. The consistency arithmetic: the numstat block captured in §1.3 (382/370/101·2/96·1/
+49·3/44·2) sums to 1050, and the committed range reads 1054 — four lines in the pair landed between
+that capture and the commit, because the lines that state the count were still being written. That
+is exactly the circularity 1.3a removes.
+
+**Decision 3 — the RDD switch, read-only:**
+
+```text
+$ gentle-ai review mode status
+receipt-driven development: on (decided by global)
+  global:      on
+  clone-local: unset
+```
+
+**What was deliberately left as written evidence.** The trap paragraph (+2106/+450/+454) and task
+1.1's share figures are historical measurements taken under the old formula, and they are preserved
+as recorded; the mirror-share claim they carry holds under both formulas (~49% of each pair's
+documentation lines). The ES mirror's `## Next step` had drifted before this unit — it named the
+chain-strategy question and task 1.2 — and was regenerated to mirror the English, which is where
+that heading now reads.
+
+## RDD conformance
+
+A section because the supervisor made an explicit decision about this feature's candidates on
+2026-09-17, and the decision is recorded here rather than left implicit in a log line.
+
+- **Outcome: no lineage, no consent, no capture — the candidates of this feature were left
+  unreviewed by explicit supervisor decision.** No native review transaction exists for this
+  feature: nothing was STARTed, no consent envelope was issued, and no reviewer ran. The native
+  review remains the independent check on the writer, and this feature does not have one.
+- **Scope: this feature only.** The decision does not change repository-wide policy. The review
+  switch still reads `global: on`, `clone-local: unset` — verified with the read-only
+  `gentle-ai review mode status` (raw output in §1.3a). RDD stays on; other features'
+  candidates are unaffected.
+- **Why.** The supervisor was informed, before deciding, that the candidate was uncommitted and
+  that review would run four lenses per work unit. The review entry rule carries an exception
+  for a trivial passive documentation-only edit, and this feature changes only Markdown. The
+  in-repo precedent is `repo-hygiene.md` §1.8, where the native review was skipped on the same
+  exception and the risk-gated path was satisfied by a recomputed check instead.
+- **What carries the check instead.** Task 1.6's mechanical verification — every structure
+  present, every `[x]` resolving, every `[ ]` reasoned, fenced blocks byte-identical, prose
+  diffed — including the constructed counter-example that must make the block-hash check fail,
+  so the check is demonstrably able to fail.
+- **What was NOT available.** An approved native review and its verdict. This feature therefore
+  carries no review verdict; the recorded outcome is the explicit opt-out, and everything else
+  in this document is the writer's own verification under the supervisor's decision.
+
 ## Out of scope
 
 - The upstream fix. The supervisor decided (2026-09-17) not to file an issue against
@@ -369,4 +588,4 @@ section, in the overruled document itself.
 
 ## Next step
 
-Run task 1.3 (`repo-hygiene.md` and its Spanish mirror), then 1.4, 1.5, and the verification in 1.6.
+Run task 1.4 (`s1-foundation.md` and its Spanish mirror), then 1.5, and the verification in 1.6.

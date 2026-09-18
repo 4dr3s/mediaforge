@@ -72,9 +72,14 @@ Recorded 2026-09-17, when this structure was added to the document. The numbers 
 retrospectively from the commits, not estimated at creation — this feature predates the field.
 
 - **Strategy:** `single-pr` (retrospective; the field did not exist when the work was planned).
-- **Forecast:** +1572 authored changed lines (additions plus deletions, lockfiles and generated files
-  excluded) — +1002 code and tests, +284 English documentation, +286 Spanish mirror. That is ~3.9× the
-  ~400 advisory budget, with no chain applied.
+- **Forecast:** +1598 authored changed lines, additions plus deletions — the single formula the
+  supervisor settled on 2026-09-17 — lockfiles and generated files excluded: +1004 code and
+  tests, +308 English documentation, +286 Spanish mirror. That is ~4× the ~400 advisory budget,
+  with no chain applied. *(Corrected in 1.3a, 2026-09-17: this row previously read +1572 =
+  +1002/+284/+286 at ~3.9× — that is the net measurement (additions minus deletions) of the
+  same range, `git log 2a62fa7..96f03f6 --numstat`. The +1572 set is kept here as the
+  historical number, and the corrected +1598 = +1004/+308/+286 is the additions-plus-deletions
+  re-measurement, raw output in `odd-doc-structure.md` §1.3a.)*
 - **Slice boundaries:** none, because none were used. The work sits on one local branch,
   `feat/wu3-contract`, with no upstream and no pull request, holding `e806a4f` (tracking), `0220b84`
   (the two parity suites), `7b432f6` (the contract, the registry and both validators) and `96f03f6`

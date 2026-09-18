@@ -94,14 +94,21 @@ entrega no tiene precedente en ningún lado, upstream incluido.
   lockfiles excluidos) sobre 8 documentos, 4 en inglés más 4 espejos en español que actúan como una
   unidad cada uno. Base medida: las adiciones por documento son 4 estructuras × ~15–20 líneas,
   duplicadas por el espejo.
-- **Conteo corriente:** 1054 líneas autoradas cambiadas a través de los slices 1.1, 1.2 y 1.3
-  juntos, medidas desde la base de la feature branch `96f03f6` con `git diff --numstat 96f03f6`
-  (incluyendo las ediciones sin commitear del slice 1.3, y las líneas de este mismo bullet): 515
-  en los documentos en inglés y 539 en sus espejos en español, así que los espejos vuelven a ser
-  ~51% del costo. Son altas más bajas, la única fórmula que el supervisor unificó el 2026-09-17;
-  los cuatro totales de §1.1 son *netos*, que es el defecto registrado abajo y corregido en 1.3a.
-  La base es la lección dura de §1.1, el punto de bifurcación y no el tip de la feature anterior:
-  un rango que arranca en `2a62fa7` se tragaría los cuatro commits de `wu3-contract`, ancestros
+- **Conteo corriente:** los slices 1.1, 1.2 y 1.3 juntos miden **1054** líneas autoradas
+  cambiadas, adiciones más deleciones — la única fórmula que el supervisor unificó el 2026-09-17 —
+  ancladas a los **commits** y medidas con `git diff --numstat 96f03f6..ad8b122`: 515 en los
+  documentos en inglés y 539 en sus espejos en español, así que los espejos vuelven a ser ~51%
+  del costo. Re-anclado en 1.3a (2026-09-17): el bullet anterior medía el árbol de trabajo
+  (`git diff --numstat 96f03f6`) y así incluía sus propias líneas y se movía con cada edición
+  posterior; el slice 1.3 ya está commiteado como `ad8b122`, y un conteo anclado a commits no
+  puede ser invalidado por el acto de escribirlo. Este work unit (1.3a) agrega sus propias
+  líneas autoradas por encima, contadas por separado contra el árbol de trabajo con
+  `git diff --numstat ad8b122` — salida y totales crudos en §1.3a; ese conteo incluye las
+  líneas del propio registro (el mecanismo de re-medición de §1.1). El forecast de ~750 no se
+  sostiene: 1054 ya está medido sobre los primeros tres slices, y todavía faltan los dos pares
+  de documentos restantes (1.4, 1.5) y el slice de verificación (1.6). La base sigue siendo la
+  lección dura de §1.1, el punto de bifurcación y no el tip de la feature anterior: un rango
+  que arranca en `2a62fa7` se tragaría los cuatro commits de `wu3-contract`, ancestros
   de esta branch.
 - **Fronteras de slice:** cinco slices, uno por par de documentos (un documento en inglés más su
   espejo español), apilados sobre `feat/odd-doc-structure` e integrados al final. El slice 1 es el par
@@ -140,6 +147,30 @@ verificador (F1, F2, F3) como próxima acción, porque eso es lo que el document
 Agregar las cuatro estructuras, corregir la línea de `Status` que hoy contradice el slice pusheado, y
 dejar **1.6 en `[ ]`** con la razón: no hay sección de evidencia, el rastro está sólo en el hallazgo
 F5.
+
+### 1.3a — Corregir la fórmula del forecast a adiciones más deleciones, y registrar la decisión de conformidad con el RDD · owner: IA
+
+Dos decisiones del supervisor, tomadas el 2026-09-17 (el día en que se creó esta feature), aplicadas
+acá:
+
+- **Una única fórmula de forecast.** La única fórmula es adiciones más deleciones. Los cuatro
+  totales de §1.1 eran *netos* (adiciones menos deleciones) y se corrigen, dejando las cifras
+  netas viejas visibles y etiquetadas; `## Delivery` de `wu3-contract.md` lleva la misma
+  corrección.
+- **Conteo corriente re-anclado.** Los slices 1.1–1.3 se miden desde los commits (`git diff
+  --numstat 96f03f6..ad8b122`), porque la medición del árbol de trabajo incluía las líneas del
+  propio bullet y se movía con cada edición. Las líneas propias de este work unit se cuentan por
+  separado.
+- **La decisión de RDD.** El supervisor optó por saltear la revisión nativa para los candidatos de
+  esta feature, explícita e informadamente, por la excepción de edición pasiva trivial sólo de
+  documentación de la regla de entrada de revisión, con precedente en el repo en `repo-hygiene.md`
+  §1.8. El resultado queda registrado en la nueva sección `## Conformidad con el RDD`; la
+  verificación mecánica de la tarea 1.6 carga con el check en su lugar.
+
+**Aceptación:** cada número corregido está medido y su salida cruda está en §1.3a; ningún número
+corregido reemplaza a uno viejo sin que la cifra vieja siga visible y etiquetada; los espejos
+`.es.md` se regeneran en paso; y el registro de RDD nombra el resultado, su alcance y qué lleva la
+feature en su lugar.
 
 ### 1.4 — `s1-foundation.md` y su espejo español · owner: IA
 
@@ -181,6 +212,7 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | 1.1 | La forma uniforme y los hechos medidos | `[x]` | §1.1 |
 | 1.2 | `wu3-contract.md` + espejo | `[x]` | §1.2 |
 | 1.3 | `repo-hygiene.md` + espejo | `[x]` | §1.3 |
+| 1.3a | Corregir la fórmula de §1.1, re-anclar el conteo corriente, registrar la decisión de RDD | `[x]` | §1.3a |
 | 1.4 | `s1-foundation.md` + espejo | `[ ]` | — |
 | 1.5 | `wu2-data-model.md` + espejo | `[ ]` | — |
 | 1.6 | Verificación sobre los 8 documentos | `[ ]` | — |
@@ -195,14 +227,27 @@ Salida cruda, agregada a medida que cierra cada tarea. Verbatim, sin parafrasear
 Líneas autoradas por feature, medidas con `git log <rango> --numstat`, adiciones más deleciones,
 excluyendo `pnpm-lock.yaml`, rutas `generated` y archivos `.lock`:
 
-| Feature | Rango | Total | Código/tests | Docs EN | Docs ES |
-| --- | --- | --- | --- | --- | --- |
-| `s1-foundation` | `b05afcd..9eb288b` | +1930 | +666 | +642 | +622 |
-| `repo-hygiene` | `9eb288b..1c73e4c` | +951 | +20 | +459 | +472 |
-| `wu2-data-model` | `1c73e4c..2a62fa7` | +3224 | +1502 | +865 | +857 |
-| `wu3-contract` | `2a62fa7..96f03f6` | +1572 | +1002 | +284 | +286 |
+| Feature | Rango | Total (altas+bajas) | Código/tests | Docs EN | Docs ES | Total anterior (neto) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `s1-foundation` | `b05afcd..9eb288b` | +1934 | +666 | +644 | +624 | +1930 |
+| `repo-hygiene` | `9eb288b..1c73e4c` | +1163 | +20 | +585 | +558 | +951 |
+| `wu2-data-model` | `1c73e4c..2a62fa7` | +4478 | +2092 | +1219 | +1167 | +3224 |
+| `wu3-contract` | `2a62fa7..96f03f6` | +1598 | +1004 | +308 | +286 | +1572 |
 
-Cada feature supera el presupuesto advisory de ~400 líneas, por 2,4× a 8×. En tres de cuatro, el espejo
+**Corregido en 1.3a, 2026-09-17.** Las cuatro filas de arriba eran originalmente totales
+*netos* (adiciones menos deleciones) — +1930 = +666/+642/+622, +951 = +20/+459/+472,
++3224 = +1502/+865/+857, +1572 = +1002/+284/+286 — contradiciendo la oración de fórmula que
+las encabeza. El supervisor unificó el 2026-09-17 una sola fórmula, **adiciones más deleciones**,
+y las filas se re-midieron desde los commits con `git log <rango> --numstat` (las dos fórmulas,
+salida cruda en §1.3a): +1934 = +666/+644/+624, +1163 = +20/+585/+558, +4478 =
++2092/+1219/+1167, +1598 = +1004/+308/+286. Las cifras netas viejas quedan visibles: la
+columna `Total anterior (neto)`, y completas en la oración de arriba como medición histórica.
+Otros números de esta sección medidos en su momento quedan como evidencia escrita (los
++2106/+450/+454 del párrafo de la trampa y las cifras de participación del texto de la tarea
+1.1); la afirmación del espejo se sostiene con las dos fórmulas, ~49% de las líneas de
+documentación de cada par.
+
+Cada feature supera el presupuesto advisory de ~400 líneas, por 2,9× a 11,2×. En tres de cuatro, el espejo
 español por sí solo está en o por encima del presupuesto entero, y ningún documento registra ese costo.
 
 La ausencia de las cuatro estructuras, medida sobre los 4 documentos en inglés:
@@ -339,7 +384,11 @@ autoradas en total — 515 en los documentos en inglés y 539 en sus espejos en 
 los espejos vuelven a ser ~51% del costo. Son altas más bajas, que ahora es la única fórmula
 vigente en este documento; los cuatro totales de §1.1 son netos, y unificarlos es la tarea 1.3a.
 Re-medir después de escribir es el mecanismo de §1.1, así que el total incluye las líneas de
-esta misma sección.
+esta misma sección. *(Nota de consistencia, 1.3a, 2026-09-17: 1054 fue la medición del árbol de
+trabajo, capturada antes del commit e incluyendo las líneas que lo afirman. El slice 1.3 ya
+aterrizó como `ad8b122`, y el rango anclado a commits `git diff --numstat 96f03f6..ad8b122`
+reproduce exactamente 1054 — la aritmética está en §1.3a — así que el valor histórico
+sobrevive intacto mientras 1.3a re-ancla el bullet a los commits.)*
 
 **Lo que me sorprendió.**
 
@@ -350,7 +399,10 @@ esta misma sección.
    s1-foundation.md, s1-foundation.es.md, .gitattributes, package.json, Makefile y el `tasks.md`
    del SDD agrupado en los docs en inglés). La aritmética de §1.1 contradice su propia oración de
    fórmula; el forecast corregido (adiciones más deleciones) está registrado en `## Delivery` de
-   `repo-hygiene.md`, y la fila de §1.1 queda intacta como evidencia aceptada.
+   `repo-hygiene.md`, y la fila de §1.1 queda intacta como evidencia aceptada. *(Superado en 1.3a,
+   2026-09-17: el supervisor unificó la única fórmula como adiciones más deleciones, y las cuatro
+   filas de §1.1 se corrigieron con las cifras netas viejas visibles y etiquetadas, en lugar de
+   "intacta"; ver §1.1 y §1.3a.)*
 2. **El espejo español de este documento ya se había desviado antes de este slice.** La fila 1.2
    de `## Progress` en `odd-doc-structure.es.md` leía `[ ]` mientras la tabla canónica en inglés
    leía `[x]` (la evidencia §1.2 existe en los dos archivos). Detectado al regenerar el espejo acá;
@@ -369,6 +421,182 @@ tiene la salida cruda de pi-lens y la decisión de no accionar, F5 la salida cru
 hallazgo diferido de `uv`. El cuerpo de la tarea de arriba conserva su texto original; la anulación
 queda registrada acá y, como sección de evidencia, en el propio documento anulado.
 
+### 1.3a — la corrección de la fórmula, el conteo re-anclado y el registro de RDD (2026-09-17)
+
+Todo lo de esta sección sale de un comando, y cada número es un valor medido; donde el original se
+conservó deliberadamente como evidencia escrita, se dice y no se esconde. Los totales de altas+bajas
+y los desgloses por categoría dictados por el supervisor se reprodujeron exactos — no se le corrigió
+nada al padre. La única discrepancia encontrada fue mi propia primera corrida de awk, que imprimía
+mal el desglose neto por categoría (los acumuladores netos quedaron fuera de la rama de categoría,
+así que cada columna imprimía el total); la corrida corregida de abajo es el registro.
+
+**Check 1 — la re-medición por feature, las dos fórmulas.** Mismos rangos, mismas exclusiones
+(`pnpm-lock.yaml`, rutas `generated`, archivos `.lock`; `migration_lock.toml` es un `.toml`, no un
+archivo `.lock`, y cuenta como código/tests):
+
+```text
+$ for r in "b05afcd..9eb288b" "9eb288b..1c73e4c" "1c73e4c..2a62fa7" "2a62fa7..96f03f6"; do git log "$r" --numstat | grep -v '^$' | grep -v '^commit ' | grep -v '^Author' | grep -v '^Date' | grep -v '^    ' | awk -v R="$r" '$3 !~ /pnpm-lock\.yaml$/ && $3 !~ /generated/ && $3 !~ /\.lock$/ { if ($3 ~ /\.es\.md$/) { addes+=$1+$2; netes+=$1-$2 } else if ($3 ~ /\.md$/) { adden+=$1+$2; neten+=$1-$2 } else { addcode+=$1+$2; netcode+=$1-$2 } } END { printf "=== %s ===\nadd+del total: %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\nnet (add-del): %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\n", R, addcode+adden+addes, addcode, adden, addes, netcode+neten+netes, netcode, neten, netes }'; done
+=== b05afcd..9eb288b ===
+add+del total: 1934 (code/tests=666, Docs EN=644, Docs ES=624)
+net (add-del): 1930 (code/tests=666, Docs EN=642, Docs ES=622)
+=== 9eb288b..1c73e4c ===
+add+del total: 1163 (code/tests=20, Docs EN=585, Docs ES=558)
+net (add-del): 951 (code/tests=20, Docs EN=459, Docs ES=472)
+=== 1c73e4c..2a62fa7 ===
+add+del total: 4478 (code/tests=2092, Docs EN=1219, Docs ES=1167)
+net (add-del): 3224 (code/tests=1502, Docs EN=865, Docs ES=857)
+=== 2a62fa7..96f03f6 ===
+add+del total: 1598 (code/tests=1004, Docs EN=308, Docs ES=286)
+net (add-del): 1572 (code/tests=1002, Docs EN=284, Docs ES=286)
+```
+
+La columna de altas+bajas es la que ahora lleva la tabla de §1.1; la columna neta es la medición
+vieja (`Total anterior (neto)`). Los desgloses netos reproducen las filas viejas exactas —
+666/642/622, 20/459/472, 1502/865/857, 1002/284/286.
+
+**Check 2 — conteo de encabezados `##`, EN vs ES, ambos pares:**
+
+```text
+$ for p in odd-doc-structure wu3-contract; do printf '%s: EN=%s ES=%s\n' "$p" "$(grep -c '^## ' odd/tasks/$p.md)" "$(grep -c '^## ' odd/tasks/$p.es.md)"; done
+odd-doc-structure: EN=10 ES=10
+wu3-contract: EN=10 ES=10
+```
+
+**Check 3 — bloques de código cercados idénticos byte a byte, ambos pares.** El par de wu3, que este
+registro no toca dentro de sus cercos:
+
+```text
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu3-contract.md | md5sum
+6e58b62bedfa054f43d9a83cdb1ce708  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/wu3-contract.es.md | md5sum
+6e58b62bedfa054f43d9a83cdb1ce708  -      # identical
+```
+
+El par que contiene estas mismas líneas no puede declarar su propio hash adentro sin circularidad,
+así que se mide aparte, en prosa: `awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `f8dd5e327a4391e76ec58d9c557b24be`, y el mismo comando sobre `odd-doc-structure.es.md` → `f8dd5e327a4391e76ec58d9c557b24be` — idéntico.
+
+**Check 4 — todo `[x]` de `## Progress` resuelve a un encabezado del mismo documento:**
+
+```text
+$ for f in odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md odd/tasks/wu3-contract.md odd/tasks/wu3-contract.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+wu3-contract.md: §1.1 OK
+wu3-contract.md: §1.2 OK
+wu3-contract.md: §1.3 OK
+wu3-contract.es.md: §1.1 OK
+wu3-contract.es.md: §1.2 OK
+wu3-contract.es.md: §1.3 OK
+```
+
+**Check 5 — el diff de este work unit.** `git diff --stat` y el numstat propio de la unidad, medidos
+después de escribir todo lo de esta sección (los conteos incluyen las líneas de esta misma sección):
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 266 +++++++++++++++++++++++++++++++++++---
+ odd/tasks/odd-doc-structure.md    | 257 +++++++++++++++++++++++++++++++++---
+ odd/tasks/wu3-contract.es.md      |  11 +-
+ odd/tasks/wu3-contract.md         |  11 +-
+ 4 files changed, 501 insertions(+), 44 deletions(-)
+```
+
+Una lectura del diff, archivo por archivo: `odd-doc-structure.md` — el bullet del conteo corriente
+reemplazado (re-anclado a commits), la tabla de §1.1 corregida con la nueva columna `Old total
+(net)` y una nota de corrección etiquetada, la oración del multiplicador corregida (2,9× a 11,2×),
+dos notas etiquetadas agregadas al §1.3 (consistencia + superado), la nueva tarea 1.3a, la nueva
+fila de `## Progress`, la nueva sección `## Conformidad con el RDD`, la nueva entrada de evidencia
+`### 1.3a`, y la actualización de una línea del `## Next step`; `odd-doc-structure.es.md` — los
+mismos cambios, traducidos; `wu3-contract.md` y su espejo — sólo el bullet `**Forecast:**` de
+`## Delivery`, corregido con el set viejo +1572 conservado y etiquetado. Ninguna otra línea cambió.
+Las líneas autoradas propias de la unidad, desde el árbol de trabajo:
+
+```text
+$ git diff --numstat ad8b122
+247	19	odd/tasks/odd-doc-structure.es.md
+238	19	odd/tasks/odd-doc-structure.md
+8	3	odd/tasks/wu3-contract.es.md
+8	3	odd/tasks/wu3-contract.md
+
+add+del total for this unit: 545 (EN=268, ES=277)
+```
+
+**Slices 1.1–1.3, anclados a commits (Decisión 2):**
+
+```text
+$ git diff --numstat 96f03f6..ad8b122
+384	0	odd/tasks/odd-doc-structure.es.md
+372	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	3	odd/tasks/wu3-contract.es.md
+44	2	odd/tasks/wu3-contract.md
+```
+
+add+del total: **1054** (515 inglés, 539 español). Un conteo anclado a commits no puede ser
+invalidado por el acto de escribirlo, que es por qué el bullet ahora descansa en este rango y no en
+el árbol de trabajo. La aritmética de consistencia: el bloque de numstat capturado en §1.3
+(382/370/101·2/96·1/49·3/44·2) suma 1050, y el rango commiteado lee 1054 — cuatro líneas del par
+aterrizaron entre esa captura y el commit, porque las líneas que afirman el conteo todavía se
+estaban escribiendo. Esa es exactamente la circularidad que 1.3a remueve.
+
+**Decisión 3 — el switch de RDD, sólo-lectura:**
+
+```text
+$ gentle-ai review mode status
+receipt-driven development: on (decided by global)
+  global:      on
+  clone-local: unset
+```
+
+**Lo que se dejó deliberadamente como evidencia escrita.** El párrafo de la trampa (+2106/+450/+454)
+y las cifras de participación del texto de la tarea 1.1 son mediciones históricas tomadas con la
+fórmula vieja, y se conservan tal como quedaron registradas; la afirmación del espejo que llevan se
+sostiene con las dos fórmulas (~49% de las líneas de documentación de cada par). El `## Next step`
+del espejo español se había desviado antes de esta unidad — nombraba la pregunta de estrategia de
+cadena y la tarea 1.2 — y se regeneró para espejar el inglés, que es donde ese encabezado ahora lee.
+
+## Conformidad con el RDD
+
+Una sección porque el supervisor tomó una decisión explícita sobre los candidatos de esta feature
+el 2026-09-17, y la decisión se registra acá en lugar de quedar implícita en una línea de log.
+
+- **Resultado: sin linaje, sin consentimiento, sin captura — los candidatos de esta feature
+  quedaron sin revisar por decisión explícita del supervisor.** No existe ninguna transacción de
+  revisión nativa para esta feature: no se STARTeó nada, no se emitió ningún envelope de
+  consentimiento, y ningún revisor corrió. La revisión nativa sigue siendo el check independiente
+  sobre la escritura, y esta feature no tiene uno.
+- **Alcance: sólo esta feature.** La decisión no cambia la política del repo. El switch de
+  revisión sigue leyendo `global: on`, `clone-local: unset` — verificado con el comando de
+  sólo-lectura `gentle-ai review mode status` (salida cruda en §1.3a). El RDD sigue prendido; los
+  candidatos de las demás features no se ven afectados.
+- **Por qué.** El supervisor fue informado, antes de decidir, de que el candidato estaba sin
+  commitear y de que la revisión correría cuatro lentes por work unit. La regla de entrada de la
+  revisión tiene una excepción para una edición pasiva trivial de sólo documentación, y esta
+  feature sólo cambia Markdown. El precedente en el repo es `repo-hygiene.md` §1.8, donde la
+  revisión nativa se salteó con la misma excepción y el camino con riesgo se satisfizo con un
+  check recalculado en su lugar.
+- **Qué carga con el check en su lugar.** La verificación mecánica de la tarea 1.6 — toda
+  estructura presente, todo `[x]` que resuelve, todo `[ ]` con razón, bloques cercados idénticos
+  byte a byte, prosa diffeada — incluido el contraejemplo construido que tiene que hacer fallar el
+  hash de bloques, para que el check sea demostrablemente capaz de fallar.
+- **Qué NO estuvo disponible.** Una revisión nativa aprobada y su veredicto. Esta feature por lo
+  tanto no lleva ningún veredicto de revisión; el resultado registrado es el opt-out explícito, y
+  todo lo demás en este documento es la verificación propia del writer bajo la decisión del
+  supervisor.
+
 ## Fuera de alcance
 
 - El fix upstream. El supervisor decidió (2026-09-17) no levantar un issue contra
@@ -381,4 +609,4 @@ queda registrada acá y, como sección de evidencia, en el propio documento anul
 
 ## Next step
 
-Responder la pregunta de estrategia de cadena registrada en `## Delivery`, y después correr la tarea 1.2.
+Correr la tarea 1.4 (`s1-foundation.md` y su espejo español), después la 1.5, y la verificación en 1.6.

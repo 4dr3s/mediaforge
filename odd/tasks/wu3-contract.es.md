@@ -77,9 +77,14 @@ retrospectivamente desde los commits, no se estimaron en la creación — esta f
 campo.
 
 - **Estrategia:** `single-pr` (retrospectiva; el campo no existía cuando se planificó el trabajo).
-- **Forecast:** +1572 líneas autoradas cambiadas (adiciones más deleciones, lockfiles y archivos
-  generados excluidos) — +1002 de código y tests, +284 de documentación en inglés, +286 de espejo en
-  español. Eso es ~3,9× el presupuesto advisory de ~400, sin cadena aplicada.
+- **Forecast:** +1598 líneas autoradas cambiadas, adiciones más deleciones — la única fórmula que
+  el supervisor unificó el 2026-09-17 — lockfiles y archivos generados excluidos: +1004 de código
+  y tests, +308 de documentación en inglés, +286 de espejo en español. Eso es ~4× el presupuesto
+  advisory de ~400, sin cadena aplicada. *(Corregido en 1.3a, 2026-09-17: esta fila antes leía
+  +1572 = +1002/+284/+286 a ~3,9× — esa es la medición *neta* (adiciones menos deleciones) del
+  mismo rango, `git log 2a62fa7..96f03f6 --numstat`. El set +1572 queda acá como número
+  histórico, y el +1598 = +1004/+308/+286 corregido es la re-medición de adiciones más
+  deleciones, salida cruda en el §1.3a de `odd-doc-structure.md`.)*
 - **Fronteras de slice:** ninguna, porque no se usó ninguna. El trabajo está en una sola branch local,
   `feat/wu3-contract`, sin upstream y sin pull request, con `e806a4f` (rastreo), `0220b84` (las dos
   suites de paridad), `7b432f6` (el contrato, el registry y los dos validadores) y `96f03f6` (el
