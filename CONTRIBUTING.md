@@ -48,7 +48,10 @@ Subjects follow Conventional Commits, verified against the repository's own hist
 ^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9._-]+\))?: .+$
 ```
 
-Measured on 2026-09-18: all **46** existing commit subjects match this regex.
+Measured on 2026-09-18: every existing commit subject matches this regex — 47 of 47, counted with
+`git log --format='%s' | grep -cE '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._-]+\))?!?: .+'`.
+The count is not stated as a fixed number on purpose: it moves with every commit, and this
+repository has already recorded what a number that nobody re-measures costs.
 
 ## Labels
 
@@ -96,7 +99,7 @@ uvx --from yamllint==1.38.0 yamllint -c .yamllint docker/compose.yaml .yamllint 
 
 `pnpm test:api` and `pnpm test:worker` (the root `package.json` scripts) are shorthand for the two
 test commands and are the portable path: GNU make is **not** installed on the author's Windows
-machine, so those scripts are what actually runs there (measured in `odd/tasks/s1-foundation.md`
+machine, so those scripts are what actually runs there (measured in `odd/tasks/repo-hygiene.md`
 §1.5; the `Makefile` documents the equivalent targets for Linux and CI). `--fail-if-no-match` is
 required, not decorative — without it a typo'd `--filter` exits `0` while running nothing
 (defect D1).

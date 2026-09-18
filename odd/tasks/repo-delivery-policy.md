@@ -55,7 +55,9 @@ Two distinctions this feature keeps separate, because they are not the same prob
    not, the description stands alone. CI validates **label and branch**, not `Closes #N`.
 2. **PR #1 is regularized, not exempted.** An issue is opened describing what it carries (retroactive,
    marked `status:approved` because the work is already authorized), the PR gains its `type:*` label,
-   and its body is rewritten with the new template and `Closes #1`. The bootstrap leaves no debt and CI
+   and its body is rewritten with the new template and `Closes #2` — the issue number GitHub
+   assigned to the retroactive issue, because issues and pull requests share one number space and
+   PR #1 already occupies `1`. The bootstrap leaves no debt and CI
    is green from the first PR.
 3. **CI runs four jobs**: `api`, `worker`, `lint`, `policy`. The lint job covers **`ruff` and
    `yamllint`** — the two linters this repo already configures. **No `shellcheck` job**: the repo has
@@ -150,7 +152,7 @@ names the four CI jobs and their rules exactly as the workflow implements them.
 ### 1.4 — Regularize PR #1 · owner: AI · route: inline · trigger: none (a remote mutation, not a file edit)
 
 Per decision 2: open the issue describing what PR #1 carries, with `status:approved`; add the `type:*`
-label to PR #1; rewrite its body using the new template with `Closes #1`; and confirm the `policy` job
+label to PR #1; rewrite its body using the new template with `Closes #2`; and confirm the `policy` job
 passes on it.
 
 **Acceptance:** `gh pr view 1` shows the label, the rewritten body and the linked issue; the `policy`
