@@ -114,12 +114,17 @@ entrega no tiene precedente en ningún lado, upstream incluido.
   registrado del árbol de trabajo del slice, 390 (EN=191, ES=199) — salida cruda y aritmética en
   §1.5. El valor histórico del árbol de trabajo (`git diff --numstat c96dd3d`, registrado en §1.4)
   queda visible y etiquetado: leía los mismos 390, y el rango commiteado lo confirma línea por
-  línea. El slice 1.5, el que este bullet está actualizando, no tiene commit todavía, así que nada
-  de lo suyo está anclado a uno: sus propias líneas se cuentan contra el árbol de trabajo en
-  `64177be` con `git diff --numstat 64177be` — salida cruda y totales en §1.5; ese conteo incluye
-  las líneas del propio registro (el mecanismo de re-medición de §1.1). Los slices 1.1–1.3
-  mantienen su ancla de commits (`96f03f6..ad8b122` = 1054, arriba) y el work unit propio de 1.3a
-  mantiene su conteo registrado contra `ad8b122` (545, en §1.3a).
+  línea. El slice 1.5 aterrizó como `373598a`, así que ahora está anclado a commits como los
+  slices 1.1–1.4: `git diff --numstat 64177be..373598a` reproduce exactamente el total registrado
+  del árbol de trabajo del slice, 769 (EN=376, ES=393) — salida cruda y aritmética en §1.5. El
+  slice 1.6, el que este bullet está actualizando, no tiene commit todavía, así que nada de lo
+  suyo está anclado a uno: sus propias líneas se cuentan contra el árbol de trabajo en
+  `373598a` con `git diff --numstat 373598a` — salida cruda y el total en §1.6; ese conteo
+  incluye las líneas del propio registro (el mecanismo de re-medición de §1.1) y la línea del
+  token del espejo de wu2 (Corrección 1). Los slices 1.1–1.3 mantienen su ancla de commits
+  (`96f03f6..ad8b122` = 1054, arriba), el work unit propio de 1.3a mantiene su conteo registrado
+  contra `ad8b122` (545, en §1.3a) y el slice 1.4 sigue anclado a commits en
+  `c96dd3d..64177be` = 390 (EN=191, ES=199, en §1.5).
 - **Fronteras de slice:** cinco slices, uno por par de documentos (un documento en inglés más su
   espejo español), apilados sobre `feat/odd-doc-structure` e integrados al final. El slice 1 es el par
   de este mismo documento, del work-unit 1.1 (`92c5fb4`); los slices 2–5 son las tareas 1.2–1.5. El
@@ -225,8 +230,8 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | 1.3a | Corregir la fórmula de §1.1, re-anclar el conteo corriente, registrar la decisión de RDD | `[x]` | §1.3a |
 | 1.4 | `s1-foundation.md` + espejo | `[x]` | §1.4 |
 | 1.5 | `wu2-data-model.md` + espejo | `[x]` | §1.5 |
-| 1.6 | Verificación sobre los 8 documentos | `[ ]` | — |
-| 1.7 | Cierre | `[ ]` | — |
+| 1.6 | Verificación sobre los 8 documentos | `[x]` | §1.6 |
+| 1.7 | Cierre | `[ ]` | — **no cerrada**: no puede tildarse hasta que este slice de verificación esté commiteado y revisado |
 
 ## Registro de evidencia
 
@@ -1008,6 +1013,295 @@ capturas de prueba de prosa de arriba son valores de captura por diseño (el mec
 de §1.1), y esta nota les suma sus propias líneas — el rango commiteado va a confirmar los números
 cuando este work unit aterrice.
 
+### 1.6 — Verificación sobre los 8 documentos (2026-09-17)
+
+Se corrió una batería de verificación de sólo lectura en HEAD `373598a`, por un verificador
+independiente, con la salida cruda de abajo registrada verbatim — cada check, cada control
+negativo y cada falla, incluidos los fallos de scanner del propio verificador y las dos cifras
+del paquete que no se reprodujeron (registradas como medidas). La regla de aceptación de la
+tarea aplica a cada check: un check que no puede fallar no es un check, así que cada uno se
+demuestra fallando contra un contraejemplo construido sobre una copia en `/tmp`, y esa falla
+queda al lado del pase.
+
+**Check 1 — las cuatro estructuras presentes en los 8 documentos. PASS.**
+
+```text
+s1-foundation.md: Progress=1 Next=1 Delivery=1 Constraints=1
+s1-foundation.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+repo-hygiene.md: Progress=1 Next=1 Delivery=1 Constraints=1
+repo-hygiene.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu2-data-model.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu2-data-model.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu3-contract.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu3-contract.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+```
+
+Control negativo: borrar la línea `## Delivery` de una copia en `/tmp` de `wu2-data-model.md` da
+`Progress=1 Next=1 Delivery=0 Constraints=1` — el check falla.
+
+**Check 2 — todo `[x]` resuelve a una sección de evidencia del mismo documento. PASS.**
+
+46 filas `[x]`, 46 punteros, todos encontrados — el escaneo cuenta sólo la columna de estado
+la tabla de Progress de cada documento (un escaneo suelto que también matcheara la oración
+de introducción contaría de más): par s1 4/4, par repo-hygiene 8/8, par wu2 8/8, par wu3 3/3
+(la fila 1.4 está `[ ]`). El escaneo está delimitado por sección: los encabezados de evidencia
+se cuentan sólo bajo `## Evidence log` / `## Log de evidencia` / `## Registro de evidencia`,
+con el guard reseteado en cada encabezado `## `. El límite es estructural, no decorativo: sin
+el límite, `s1-foundation.md` cuenta 14 encabezados `### ` en todo el archivo, de los cuales
+ocho quedan en la región de evidencia y defectos — `### 1.1`–`### 1.4` más `### D1`–`### D4`
+en las líneas 591/624/640/655 bajo los dos encabezados `## Defects…` (el paquete dijo "13";
+el archivo mide 14, y el registro guarda el valor medido) — y el par de wu2 da
+`### 1.1`–`### 1.3` dos veces cada uno (líneas 344/394, 431/472, 504/618 — las segundas
+copias son las entradas de `independent verification`).
+
+**Nota de calibración, registrada con honestidad.** Las dos primeras corridas del verificador
+FALLARON sobre los cuatro documentos en español, porque las secciones de evidencia en español
+usan dos encabezados distintos — `## Log de evidencia` en los espejos de s1/repo-hygiene,
+`## Registro de evidencia` en los de wu2/wu3. Esas fallas fueron bugs de scanner, corregidos
+al aceptar los tres nombres — y la falla es un hallazgo real sobre los espejos: sus
+encabezados de sección no son uniformes.
+
+Control negativo: apuntar la evidencia de la fila 1.8 a `§1.9` (sección inexistente) da
+`pointer §1.9 (rows: 1.8) -> MISSING   RESULT: FAIL (1 unresolved)`.
+
+**Check 3 — todo `[ ]` tiene una razón declarada. PASS bajo la lectura estricta, con una
+debilidad demostrada.**
+
+Existe exactamente una fila `[ ]` en las 8 tablas de Progress: la fila 1.4 de `wu3-contract`,
+en los dos idiomas. Su razón es por fila, verbatim (reproducida acá con grep antes de
+escribirla):
+
+```text
+| 1.4 | Closure | `[ ]` | — **not closed**: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
+| 1.4 | Cierre | `[ ]` | — **no cerrada**: el plan de fixes del verificador (F1, F2, F3, §1.3) está sin aplicar |
+```
+
+Todas las demás apariciones del string `[ ]` en los 8 documentos son citas en prosa o celdas
+de tablas de hallazgos, no filas de Progress.
+
+Control negativo, lectura estricta: reducir la celda de evidencia de la fila 1.4 a un `—`
+desnudo en una copia en `/tmp` da `row 1.4: NO per-row reason (evidence=—)   RESULT: FAIL`.
+
+**La debilidad, registrada y no escondida.** Bajo la lectura alternativa de la spec — "o una
+razón declarada en el mismo documento que cubra esa fila sin ambigüedad" — la *misma copia
+manipulada sigue PASSING*, porque `## Next step` sigue declarando la razón de la 1.4 (aplicar
+el plan de fixes del verificador F1, F2, F3 de §1.3 antes de cerrar). Así que el pass/fail
+del check depende de qué lectura elija el lector. El resultado estricto es FAIL sobre la copia
+manipulada; el resultado leniente es PASS sobre la misma copia; el registro adopta la lectura
+**estricta** — la fila de Progress misma lleva la razón, que es donde apunta el propio texto
+de la tarea ("every `[ ]` has a stated reason"), y el check estricto es el que se demuestra
+capaz de fallar. Adoptar la lectura leniente haría el check incapaz de fallar para esta tabla
+— la misma clase que el defecto D1 ya registrado en este repo, "a gate that cannot fail" —
+así que los dos resultados se declaran y el estricto es el que el registro reclama.
+
+**Check 4 — bloques de código cercados EN y ES idénticos byte a byte, por par. PASS.**
+
+```text
+s1-foundation.md EN 8d954644a76f8076f6367e059d56d6a0   ES 8d954644a76f8076f6367e059d56d6a0   (34 fence lines each = 17 blocks)
+repo-hygiene.md  EN 246e1a4a0e106c5ea69b9577af0849d8   ES 246e1a4a0e106c5ea69b9577af0849d8   (34/34 = 17/17)
+wu2-data-model.md EN 9f41d0d28cb00bb828a2ac48773c69b5  ES 9f41d0d28cb00bb828a2ac48773c69b5  (28/28 = 14/14)
+wu3-contract.md  EN 6e58b62bedfa054f43d9a83cdb1ce708   ES 6e58b62bedfa054f43d9a83cdb1ce708   (8/8 = 4/4)
+```
+
+Comando: `awk '/^```/{f=!f;next} f' <file> | md5sum`.
+
+Control negativo: cambiar un carácter dentro de un bloque cercado de una copia en `/tmp` de
+`wu3-contract.md` (`pnpm test:api` → `pnpm test:apix`) da EN
+`b4d6024e69c0926033ad5c15c2f7c2a7` contra ES `6e58b62bedfa054f43d9a83cdb1ce708` — la
+comparación de pares falla. Esta es la mitad no vacua que el registro exigía: §1.2 registró
+un pase que era el MD5 del string vacío (`d41d8cd98f00b204e9800998ecf8427e`) porque ese par
+no tenía ningún bloque cercado. Los dos primeros intentos de inyección del verificador no
+aterrizaron — la palabra elegida no estaba dentro de ningún cerco, y después el matcher exigía
+una línea `` `^```$` `` desnuda mientras el cerco real de apertura está etiquetado
+(`` ```bash ``) — por eso el control negativo de arriba se declara con la inyección exacta
+que sí aterrizó.
+
+**Check 5 — la prosa preexistente de los documentos en inglés intacta. PASS con dos hunks que se
+deben clasificar con honestidad como "reescribió una línea existente".**
+
+Rangos (cada documento desde el commit anterior a su propio slice de conversión):
+`wu3-contract.md` `5f1b556..HEAD` (4 hunks), `repo-hygiene.md` `bed5b7c..HEAD` (6 hunks),
+`s1-foundation.md` `c96dd3d..HEAD` (4 hunks), `wu2-data-model.md` `64177be..HEAD` (4 hunks).
+Clasificación:
+
+```text
+wu3-contract   4 hunks: H1 (d) rewrote the pre-existing Strict TDD bullet under the existing
+                        ## Constraints; H2 (a) ## Delivery added, within which (c) the Forecast
+                        value was corrected +1572 -> +1598 in c96dd3d; H3 (a) ## Progress;
+                        H4 (a) ## Next step
+repo-hygiene   6 hunks: H1 (b) Status corrected; H2 (a) ## Constraints; H3 (a) ## Delivery;
+                        H4 (a) ## Progress; H5 (d) added the ### 1.6 evidence section carrying the
+                        supervisor's overrule; H6 (a) ## Next step
+s1-foundation  4 hunks: H1 (b) Status corrected; H2 (a) ## Constraints + ## Delivery;
+                        H3 (a) ## Progress; H4 (a) ## Next step. No (d).
+wu2-data-model 4 hunks: H1 (d) rewrote the pre-existing Strict TDD bullet under the existing
+                        ## Constraints; H2 (a) ## Delivery; H3 (a) ## Progress; H4 (a) ## Next step
+```
+
+Los dos bullets (d) llevan el trío canónico idéntico (la cola después del runner difiere por
+documento, que es por qué cada bullet es una línea existente completada, no una nueva):
+
+```text
+**Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the two gates: `pnpm --filter api --fail-if-no-match run test` (api) and `uv run --project workers/media pytest workers/media/tests -q` (worker). …
+```
+
+**Cómo se registra esto con honestidad.** Estos dos documentos ya tenían un encabezado
+`## Constraints (non-negotiable)` y una mención parcial de TDD (sólo modo, inline — la
+ausencia exacta que midió la tabla de §1.1 para ambos), así que la estructura de TDD se
+entregó completando un bullet existente en lugar de agregar una línea nueva — que es por qué
+el diff clasifica el hunk como modificación (d) y no como adición (a). El bullet completado
+se cita arriba; el texto viejo (`openspec/config.yaml` declares `strict_tdd: true`) queda
+visible en el diff, y el resto de la oración del bullet se conservó en los dos documentos. No
+se modificó ninguna otra prosa preexistente de ninguno de los dos documentos. Esto no se
+presenta como una violación ni se esconde como un simple "agregado de estructura".
+
+`odd-doc-structure.md` mismo es el documento de la feature: no existía en `96f03f6` (`git diff
+96f03f6..HEAD --stat` → `1 file changed, 1013 insertions(+)` al momento de la corrida) y se
+espera que cambie en cada slice; su propio bookkeeping no cuenta como violación de prosa.
+Reportado por separado.
+
+Control negativo: reescribir una oración de prosa aceptada ("could not understand the result"
+→ "could not comprehend the result") en una copia en `/tmp` de `s1-foundation.md` se marca
+como categoría (d) por la misma clasificación basada en diff.
+
+**Los cuatro ítems abiertos.** Los ítems 1 y 2 se corrigieron en este mismo work unit, por
+decisión del supervisor (2026-09-17) — para cada uno, la medición cruda se conserva y la
+corrección aplicada se declara después. Los ítems 3 y 4 quedan exactamente como se midieron:
+registrados, no corregidos.
+
+1. **El token de estado.** Líneas de estado crudas, las 8, medidas al momento de la corrida:
+   `s1-foundation.md` → `` `**Status:** `closed`` ``; `s1-foundation.es.md` → `` `**Estado:**
+   `closed`` ``; `repo-hygiene.md` → `complete and pushed (9 commits, …)`;
+   `repo-hygiene.es.md` → `completo y pusheado (9 commits, …)`; `wu2-data-model.md` →
+   `` `**Status:** `closed` 2026-09-17` ``; `wu2-data-model.es.md` → `` `**Estado:** `cerrada` el
+   2026-09-17` ``; `wu3-contract.md` y `wu3-contract.es.md` → `in progress`. Estado al
+ momento de la corrida: **sigue siendo cierto** — `cerrada` aparecía exactamente una vez, en
+ el espejo de wu2; los otros tres espejos conservaban el token en inglés. **Corrección
+aplicada en este work unit (2026-09-17, supervisor):** el token en `wu2-data-model.es.md` se
+unificó a `closed` (`` `**Estado:** `closed` el 2026-09-17 — …` ``), un token en una línea,
+todo lo demás del archivo intacto, así que el token ahora lee de forma uniforme donde existe
+un token entre backticks (s1, wu2 y wu3 leen `closed` / `closed` / `in progress`; el estado
+de repo-hygiene es prosa y no lleva ninguno); re-verificado después de la edición con
+`grep -H '^\*\*Estado:\*\*' odd/tasks/*.es.md`, cuya salida se cita acá porque ningún bloque de
+checks sigue a esta lista:
+
+```text
+$ grep -H '^\*\*Estado:\*\*' odd/tasks/*.es.md
+odd/tasks/odd-doc-structure.es.md:**Estado:** `in progress` — creado el 2026-09-17.
+odd/tasks/repo-hygiene.es.md:**Estado:** completo y pusheado (9 commits, `746be7f`…`1c73e4c`, en `origin/main`) — 2026-09-17.
+odd/tasks/s1-foundation.es.md:**Estado:** `closed` — las cuatro tareas 1.1–1.4 llevan evidencia registrada; la lista de
+odd/tasks/wu2-data-model.es.md:**Estado:** `closed` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
+odd/tasks/wu3-contract.es.md:**Estado:** `in progress` — creado el 2026-09-17.
+```
+2. **Las filas `[ ]` propias del documento de la feature.** Las filas 1.6 y 1.7 de la tabla
+   `## Progress` de `odd-doc-structure.md` llevaban `—` como evidencia sin razón por fila; la
+   única razón era la oración general de introducción. Estado al momento de la corrida:
+   **sigue siendo cierto** — y la propia escritura de este registro tilda la fila 1.6 a
+   `[x]`, así que la afirmación estaba por quedar aplicada sólo a la fila 1.7. **Corrección
+   aplicada en este work unit (2026-09-17, supervisor):** la fila 1.7 (Cierre) ahora lleva
+   una razón por fila en los dos archivos — no puede tildarse hasta que este slice de
+   verificación esté commiteado y revisado — en el mismo estilo que `wu3-contract.md` usa
+   para su propia fila abierta. Ninguna fila `[ ]` de esta tabla queda sin razón declarada
+   ahora.
+3. **La afirmación `6fe5314` de §1.4.** Texto de la afirmación en `odd-doc-structure.md:565`.
+   Un escaneo con conocimiento de cercos de cada mención de `6fe5314` en `odd/tasks/`:
+   medido **12 líneas de prosa, 14 apariciones, sobre 6 de los 8 archivos** (par
+   odd-doc-structure 4/4, par repo-hygiene 2/2, par s1 1/1; el par de wu2 no tiene ninguna;
+   dos líneas llevan el token dos veces) — cada una es una **línea de prosa, ninguna dentro
+   de un bloque cercado**; no hay salida cruda de git para ninguna. (El paquete dijo "8
+   menciones"; el escaneo medido encuentra 12 líneas / 14 apariciones, y el registro guarda
+   el valor medido — la sustancia de la afirmación, toda prosa y ninguna en un cerco, no
+   cambia.) `git show 6fe5314` confirma que el commit existe: subject `docs(odd): close the
+   S1 residue list and regenerate the Spanish copies`, 4 archivos, **+562/−86**. Estado:
+   **sigue siendo cierto — no hay salida cruda registrada.** No corregido: la afirmación es
+   evidencia aceptada, y el `## Fuera de alcance` de la feature prohíbe reescribir evidencia
+   aceptada.
+4. **El "Eighteen commits on `feat/wu2-data-model`, none pushed" del `## Closure` de wu2.**
+   Medido hoy: `git rev-list --count 1c73e4c..2a62fa7` → **20**; `git rev-list --count
+   1c73e4c..2a62fa7^` → **19**; el commit de tracking `627979d` está en el rango, así que
+   20 − `627979d` − `2a62fa7` = **18**, coincidiendo sólo bajo esa reconciliación. Estado de
+   push: `git rev-parse feat/wu2-data-model` = `git rev-parse origin/feat/wu2-data-model` =
+   `2a62fa7…`, en sync; el reflog muestra `2a62fa7 refs/remotes/origin/feat/wu2-data-model@{2026-09-17
+   16:33:29 -0500}: update by push`, y la fecha de autor del commit es `16:31:01 -0500`.
+   Estado: **"eighteen" sólo bajo esa reconciliación; "none pushed" es falso hoy** — la
+   branch está en `origin` desde el 2026-09-17 16:33, unos dos minutos y medio después de
+   que la oración se escribiera. El texto del `## Closure` queda **como evidencia aceptada,
+   deliberadamente no reescrito** (el `## Fuera de alcance` de la propia feature prohíbe
+   reescribir evidencia aceptada), y esta entrada es donde la divergencia queda medida y
+   visible.
+
+**Prueba de prosa.** — el diff de esta unidad, medido desde el árbol de trabajo en `373598a`.
+Los dos bloques de diff de abajo son valores de captura por diseño (los conteos incluyen las
+líneas del propio registro — el mecanismo de re-medición de §1.1 — más la línea del token
+del espejo de wu2, Corrección 1), así que son verdaderos al momento de capturarlos y se
+re-midieron después de la última edición; si un dígito registrado difería del estado medido
+final, sólo se corrigieron los dígitos dentro de este bloque, y después se re-corrió el hash
+del par y su valor en prosa se actualizó para que coincidiera.
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 312 ++++++++++++++++++++++++++++++++++++--
+ odd/tasks/odd-doc-structure.md    | 295 +++++++++++++++++++++++++++++++++--
+ odd/tasks/wu2-data-model.es.md    |   2 +-
+ 3 files changed, 590 insertions(+), 19 deletions(-)
+
+$ git diff --numstat 373598a
+303	9	odd/tasks/odd-doc-structure.es.md
+286	9	odd/tasks/odd-doc-structure.md
+1	1	odd/tasks/wu2-data-model.es.md
+
+add+del total for this slice: 609 (EN=286, ES=305; ES = the odd-doc mirror's 303 plus the wu2 mirror's 2)
+
+$ git diff --name-only
+odd/tasks/odd-doc-structure.es.md
+odd/tasks/odd-doc-structure.md
+odd/tasks/wu2-data-model.es.md
+```
+
+**Sobre el conteo corriente.** Los slices 1.1–1.3 siguen anclados a sus commits
+(`96f03f6..ad8b122` = 1054), el work unit de 1.3a mantiene su conteo registrado contra
+`ad8b122` (545), el slice 1.4 está re-anclado (`c96dd3d..64177be` = 390, en §1.5) y el
+slice 1.5 ahora también está anclado a commits: `64177be..373598a` = 769 (EN=376, ES=393),
+reproduciendo exactamente su total registrado del árbol de trabajo. Este slice (1.6) no
+tiene commit todavía, así que su conteo es la medición del árbol de trabajo de arriba
+(`git diff --numstat 373598a`), que incluye las líneas de este registro. No se reclama
+ningún total anclado a commits — el ancla es el árbol de trabajo hasta que el work unit
+aterrice.
+
+**Lo que me sorprendió.**
+
+1. **El control negativo del check 4 sólo funcionó con una inyección exacta.** Los dos
+   primeros intentos del verificador no aterrizaron (la palabra elegida no estaba en ningún
+   cerco; después el matcher exigía una línea `` `^```$` `` desnuda mientras el cerco real de
+   apertura es `` ```bash ``) — el control negativo que se registra es el que realmente hizo
+   fallar la comparación de pares.
+2. **El escaneo delimitado por sección es el tercer límite estructural que esta feature tuvo
+   que aprender.** El escaneo de punteros de §1.4 necesitó su límite contra `### D1`–`### D4`;
+   el censo de §1.5 necesitó el suyo contra los duplicados de wu2; el check 2 necesita ambos
+   a la vez, más la calibración de tres nombres para los espejos en español.
+3. **Los espejos en español ni siquiera coinciden entre sí en el nombre de su encabezado de
+   registro de evidencia.** s1/repo-hygiene usan `## Log de evidencia`; wu2/wu3 usan
+   `## Registro de evidencia`. Los documentos en inglés usan todos `## Evidence log`. Nada en
+   la feature antes de este check había forzado a los espejos a ponerse de acuerdo.
+4. **El check 3 pasa bajo la lectura estricta y pasaría bajo la leniente incluso desnudo** —
+   la misma clase que el defecto D1 ya registrado en este repo — así que el registro reclama
+   el resultado estricto y muestra el leniente en lugar de esconder cualquiera de los dos.
+5. **Dos cifras del paquete no se reprodujeron y quedan registradas como medidas:** "13 `### `
+   encabezados" en `s1-foundation.md` (el archivo mide 14 en total, 8 en la región de
+   evidencia) y "8 menciones de `6fe5314`" (12 líneas / 14 apariciones sobre 6 archivos).
+   La sustancia de ambos checks no cambia con los conteos corregidos.
+
+Este par no puede declarar su propio hash dentro de sus propios cercos sin circularidad —
+§1.3a, §1.4 y §1.5 registran la misma restricción. Medido al final de esta entrada, después
+de la última edición de cercos (y re-medido después de la corrección de sólo dígitos del
+bloque de prueba de prosa de arriba, que es una edición de cercos): `awk '/^```/{f=!f;next} f'
+odd/tasks/odd-doc-structure.md | md5sum` → `4237ab09184eea92c277668b894b7651`, y el mismo
+comando sobre `odd-doc-structure.es.md` → `4237ab09184eea92c277668b894b7651` — idéntico.
+
+El hash del par de wu2 no lo afecta la Corrección 1 — la edición está fuera de sus cercos —
+y se re-midió después del cambio de token para confirmar que sigue coincidiendo:
+`9f41d0d28cb00bb828a2ac48773c69b5` en los dos archivos.
+
 ## Conformidad con el RDD
 
 Una sección porque el supervisor tomó una decisión explícita sobre los candidatos de esta feature
@@ -1049,4 +1343,4 @@ el 2026-09-17, y la decisión se registra acá en lugar de quedar implícita en 
 
 ## Next step
 
-Correr la tarea 1.6 (verificación sobre los 8 documentos), y después la 1.7 (cierre).
+Correr la tarea 1.7 (cierre).

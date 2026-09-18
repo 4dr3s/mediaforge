@@ -9,7 +9,7 @@
 **Fuente de verdad de los requisitos:** `openspec/changes/audio-extract-vertical-slice/` — tratada como
 solo-lectura salvo donde el supervisor pidió una corrección; `design.md` §3/§5 y el requisito de
 idempotencia de C1 se enmendaron el 2026-09-17 (tarea 1.8), cada uno con una nota fechada.
-**Estado:** `cerrada` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
+**Estado:** `closed` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
 forma independiente.
 
 ---

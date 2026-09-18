@@ -106,12 +106,16 @@ has no precedent anywhere, including upstream.
   like slices 1.1–1.3: `git diff --numstat c96dd3d..64177be` reproduces exactly the slice's recorded
   working-tree total, 390 (EN=191, ES=199) — raw output and the arithmetic in §1.5. The historical
   working-tree value (`git diff --numstat c96dd3d`, recorded in §1.4) stays visible and labelled: it
-  read the same 390, and the committed range confirms it line for line. Slice 1.5, the slice this
-  bullet is being updated by, has no commit yet, so nothing about it is anchored to one: its own
-  lines are counted against the working tree at `64177be` with `git diff --numstat 64177be` — raw
-  output and totals in §1.5; that count includes the record's own lines (the §1.1 re-measure
-  mechanism). Slices 1.1–1.3 keep their commit anchor (`96f03f6..ad8b122` = 1054, above) and slice
-  1.3a's own unit keeps its recorded count against `ad8b122` (545, in §1.3a).
+  read the same 390, and the committed range confirms it line for line. Slice 1.5 landed as
+  `373598a`, so it is now commit-anchored like slices 1.1–1.4: `git diff --numstat 64177be..373598a`
+  reproduces exactly the slice's recorded working-tree total, 769 (EN=376, ES=393) — raw output and
+  the arithmetic in §1.5. Slice 1.6, the slice this bullet is being updated by, has no commit yet,
+  so nothing about it is anchored to one: its own lines are counted against the working tree at
+  `373598a` with `git diff --numstat 373598a` — raw output and the total in §1.6; that count
+  includes the record's own lines (the §1.1 re-measure mechanism) and the wu2 mirror's token
+  line (Correction 1). Slices 1.1–1.3 keep their commit anchor (`96f03f6..ad8b122` = 1054, above),
+  slice 1.3a's own unit keeps its recorded count against `ad8b122` (545, in §1.3a), and slice 1.4
+  stays commit-anchored at `c96dd3d..64177be` = 390 (EN=191, ES=199, in §1.5).
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -210,8 +214,8 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.3a | Correct the §1.1 formula, re-anchor the running count, record the RDD decision | `[x]` | §1.3a |
 | 1.4 | `s1-foundation.md` + mirror | `[x]` | §1.4 |
 | 1.5 | `wu2-data-model.md` + mirror | `[x]` | §1.5 |
-| 1.6 | Verification across all 8 documents | `[ ]` | — |
-| 1.7 | Closure | `[ ]` | — |
+| 1.6 | Verification across all 8 documents | `[x]` | §1.6 |
+| 1.7 | Closure | `[ ]` | — **not closed**: cannot be checked off until this verification slice is itself committed and reviewed |
 
 ## Evidence log
 
@@ -971,6 +975,279 @@ matches (`9f41d0d2…`). The two prose-proof captures above are capture-time val
 re-measure mechanism), and this note adds its own lines on top of them — the committed range
 will confirm the numbers when this work unit lands.
 
+### 1.6 — Verification across all 8 documents (2026-09-17)
+
+A read-only verification battery was run at HEAD `373598a` by an independent verifier, with the
+raw output below recorded verbatim — every check, every negative control, and every failure,
+including the verifier's own scanner failures and the two packet figures that did not
+reproduce (recorded as measured). The acceptance rule from the task applies to every check: a
+check that cannot fail is not a check, so each one is demonstrated failing on a constructed
+counter-example over a `/tmp` copy, and that failure sits next to the pass.
+
+**Check 1 — the four structures present in all 8 documents. PASS.**
+
+```text
+s1-foundation.md: Progress=1 Next=1 Delivery=1 Constraints=1
+s1-foundation.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+repo-hygiene.md: Progress=1 Next=1 Delivery=1 Constraints=1
+repo-hygiene.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu2-data-model.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu2-data-model.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu3-contract.md: Progress=1 Next=1 Delivery=1 Constraints=1
+wu3-contract.es.md: Progress=1 Next=1 Delivery=1 Constraints=1
+```
+
+Negative control: deleting the `## Delivery` line from a `/tmp` copy of `wu2-data-model.md`
+yields `Progress=1 Next=1 Delivery=0 Constraints=1` — the check fails.
+
+**Check 2 — every `[x]` resolves to an evidence section in the same document. PASS.**
+
+46 `[x]` rows, 46 pointers, all found — the scan counts only the state column of the Progress
+table (a loose scan that also matched the lead-in sentence would overcount): s1 pair 4/4,
+repo-hygiene pair 8/8, wu2 pair 8/8, wu3 pair 3/3 (row 1.4 is `[ ]`). The scan is
+section-bounded: evidence headings are counted only under `## Evidence log` / `## Log de
+evidencia` / `## Registro de evidencia`, with the guard reset at every `## ` heading. The
+bound is load-bearing, not decorative: unbounded, `s1-foundation.md` counts 14 `### ` headings
+in the whole file, of which eight sit in the evidence-and-defects region — `### 1.1`–`### 1.4`
+plus `### D1`–`### D4` at lines 591/624/640/655 under the two `## Defects…` headings (the
+packet said "13"; the file measures 14, and the record keeps the measured value) — and the
+wu2 pair yields `### 1.1`–`### 1.3` twice each (lines 344/394, 431/472, 504/618 — the second
+copies are the `independent verification` entries).
+
+**Calibration note, recorded honestly.** The verifier's first two runs FAILED on the four
+Spanish documents, because the Spanish evidence sections use two different headings —
+`## Log de evidencia` in the s1/repo-hygiene mirrors, `## Registro de evidencia` in the
+wu2/wu3 mirrors. Those failures were scanner bugs, fixed by accepting all three names — and
+the failure is a real finding about the mirrors: their section headings are not uniform.
+
+Negative control: pointing row 1.8's evidence at `§1.9` (no such section) yields
+`pointer §1.9 (rows: 1.8) -> MISSING   RESULT: FAIL (1 unresolved)`.
+
+**Check 3 — every `[ ]` has a stated reason. PASS under the strict reading, with a demonstrated
+weakness.**
+
+Exactly one `[ ]` row exists across the 8 Progress tables: `wu3-contract` row 1.4, in both
+languages. Its reason is per-row, verbatim (reproduced here with grep before writing):
+
+```text
+| 1.4 | Closure | `[ ]` | — **not closed**: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
+| 1.4 | Cierre | `[ ]` | — **no cerrada**: el plan de fixes del verificador (F1, F2, F3, §1.3) está sin aplicar |
+```
+
+All other `[ ]` string occurrences in the 8 documents are prose quotes or finding-table cells,
+not Progress rows.
+
+Negative control, strict reading: reducing row 1.4's evidence cell to a bare `—` in a `/tmp`
+copy yields `row 1.4: NO per-row reason (evidence=—)   RESULT: FAIL`.
+
+**The weakness, recorded and not hidden.** Under the spec's alternative reading — "or a reason
+stated in the same document that unambiguously covers that row" — the *same tampered copy
+still PASSES*, because `## Next step` still states the reason for 1.4 (apply the verifier's
+fix plan F1, F2, F3 from §1.3 before closing). So the check's pass/fail depends on which
+reading the reader picks. The strict result is FAIL on the tampered copy; the lenient result
+is PASS on the same copy; the record adopts the **strict** reading — the Progress row itself
+carries the reason, which is where the task's own wording ("every `[ ]` has a stated reason")
+points, and the strict check is the one demonstrated able to fail. Adopting the lenient
+reading would make the check un-fail-able for this table — the same class as this repository's
+own defect D1, "a gate that cannot fail" — so both results are stated and the strict one is the
+one the record claims.
+
+**Check 4 — EN and ES fenced code blocks byte-identical, per pair. PASS.**
+
+```text
+s1-foundation.md EN 8d954644a76f8076f6367e059d56d6a0   ES 8d954644a76f8076f6367e059d56d6a0   (34 fence lines each = 17 blocks)
+repo-hygiene.md  EN 246e1a4a0e106c5ea69b9577af0849d8   ES 246e1a4a0e106c5ea69b9577af0849d8   (34/34 = 17/17)
+wu2-data-model.md EN 9f41d0d28cb00bb828a2ac48773c69b5  ES 9f41d0d28cb00bb828a2ac48773c69b5  (28/28 = 14/14)
+wu3-contract.md  EN 6e58b62bedfa054f43d9a83cdb1ce708   ES 6e58b62bedfa054f43d9a83cdb1ce708   (8/8 = 4/4)
+```
+
+Command: `awk '/^```/{f=!f;next} f' <file> | md5sum`.
+
+Negative control: changing one character inside a fenced block of a `/tmp` copy of
+`wu3-contract.md` (`pnpm test:api` → `pnpm test:apix`) gives EN
+`b4d6024e69c0926033ad5c15c2f7c2a7` against ES `6e58b62bedfa054f43d9a83cdb1ce708` — the pair
+comparison fails. This is the non-vacuous half the record demanded: §1.2 recorded a pass that
+was the MD5 of the empty string (`d41d8cd98f00b204e9800998ecf8427e`) because that pair had
+no fenced block at all. The verifier's first two injection attempts did not land — the chosen
+word was not inside any fence, and then the matcher required a bare `` `^```$` `` line while the real
+opening fence is tagged (`` ```bash ``) — which is why the negative control above is stated
+with the exact injection that did land.
+
+**Check 5 — the English documents' pre-existing prose unchanged. PASS with two hunks that must
+be classified honestly as "rewrote an existing line".**
+
+Ranges (each document from the commit before its own conversion slice): `wu3-contract.md`
+`5f1b556..HEAD` (4 hunks), `repo-hygiene.md` `bed5b7c..HEAD` (6 hunks), `s1-foundation.md`
+`c96dd3d..HEAD` (4 hunks), `wu2-data-model.md` `64177be..HEAD` (4 hunks). Classification:
+
+```text
+wu3-contract   4 hunks: H1 (d) rewrote the pre-existing Strict TDD bullet under the existing
+                        ## Constraints; H2 (a) ## Delivery added, within which (c) the Forecast
+                        value was corrected +1572 -> +1598 in c96dd3d; H3 (a) ## Progress;
+                        H4 (a) ## Next step
+repo-hygiene   6 hunks: H1 (b) Status corrected; H2 (a) ## Constraints; H3 (a) ## Delivery;
+                        H4 (a) ## Progress; H5 (d) added the ### 1.6 evidence section carrying the
+                        supervisor's overrule; H6 (a) ## Next step
+s1-foundation  4 hunks: H1 (b) Status corrected; H2 (a) ## Constraints + ## Delivery;
+                        H3 (a) ## Progress; H4 (a) ## Next step. No (d).
+wu2-data-model 4 hunks: H1 (d) rewrote the pre-existing Strict TDD bullet under the existing
+                        ## Constraints; H2 (a) ## Delivery; H3 (a) ## Progress; H4 (a) ## Next step
+```
+
+The two (d) bullets carry the identical canonical triplet (the tail after the runner differs
+per document, which is why each bullet is a completed existing line, not a new one):
+
+```text
+**Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the two gates: `pnpm --filter api --fail-if-no-match run test` (api) and `uv run --project workers/media pytest workers/media/tests -q` (worker). …
+```
+
+**How this is recorded honestly.** These two documents already had a `## Constraints
+(non-negotiable)` heading and a partial TDD mention (mode only, inline — the exact absence
+§1.1's table measured for both), so the TDD structure was delivered by completing an
+existing bullet rather than by adding a new line — which is why the diff classifies the hunk
+as a modification (d) instead of an addition (a). The completed bullet is quoted above;
+the old wording (`openspec/config.yaml` declares `strict_tdd: true`) stays visible in the
+diff, and the rest of the bullet's sentence was preserved in both documents. No other
+pre-existing prose in either document was modified. This is not presented as a violation and
+not hidden as a plain "added structure".
+
+`odd-doc-structure.md` itself is the feature document: it did not exist at `96f03f6` (`git diff
+96f03f6..HEAD --stat` → `1 file changed, 1013 insertions(+)` at the time of the run) and is
+expected to change in every slice; its own bookkeeping is not counted as a prose violation.
+Reported separately.
+
+Negative control: rewriting a sentence of accepted prose ("could not understand the result" →
+"could not comprehend the result") in a `/tmp` copy of `s1-foundation.md` is flagged as
+category (d) by the same diff-based classification.
+
+**The four open items.** Items 1 and 2 were corrected in this same work unit, by supervisor
+decision (2026-09-17) — for each, the raw measurement is kept and the applied correction is
+stated after it. Items 3 and 4 stay exactly as measured: recorded, not corrected.
+
+1. **The status token.** Raw status lines, all 8, measured at the time of the run:
+   `s1-foundation.md` → `` `**Status:** `closed`` ``; `s1-foundation.es.md` → `` `**Estado:**
+   `closed`` ``; `repo-hygiene.md` → `complete and pushed (9 commits, …)`;
+   `repo-hygiene.es.md` → `completo y pusheado (9 commits, …)`; `wu2-data-model.md` →
+   `` `**Status:** `closed` 2026-09-17` ``; `wu2-data-model.es.md` → `` `**Estado:** `cerrada` el
+   2026-09-17` ``; `wu3-contract.md` and `wu3-contract.es.md` → `in progress`. Status at the
+ time of the run: **still true** — `cerrada` appeared exactly once, in the wu2 mirror; the
+ other three mirrors kept the English token. **Correction applied in this work unit
+ (2026-09-17, supervisor):** the token in `wu2-data-model.es.md` was unified to `closed`
+ (`` `**Estado:** `closed` el 2026-09-17 — …` ``), one token on one line, everything else in
+ the file untouched, so the token now reads uniformly wherever a backticked token exists
+ (s1, wu2 and wu3 read `closed` / `closed` / `in progress`; repo-hygiene's status is prose
+ and carries none); re-verified after the edit with `grep -H '^\*\*Estado:\*\*' odd/tasks/*.es.md`,
+ whose output is quoted here because no check block follows this list:
+
+```text
+$ grep -H '^\*\*Estado:\*\*' odd/tasks/*.es.md
+odd/tasks/odd-doc-structure.es.md:**Estado:** `in progress` — creado el 2026-09-17.
+odd/tasks/repo-hygiene.es.md:**Estado:** completo y pusheado (9 commits, `746be7f`…`1c73e4c`, en `origin/main`) — 2026-09-17.
+odd/tasks/s1-foundation.es.md:**Estado:** `closed` — las cuatro tareas 1.1–1.4 llevan evidencia registrada; la lista de
+odd/tasks/wu2-data-model.es.md:**Estado:** `closed` el 2026-09-17 — tareas 1.1 a 1.8 completas, cada unidad de trabajo verificada de
+odd/tasks/wu3-contract.es.md:**Estado:** `in progress` — creado el 2026-09-17.
+```
+2. **The feature document's own `[ ]` rows.** Rows 1.6 and 1.7 in `odd-doc-structure.md`'s
+   `## Progress` table carried `—` as evidence with no per-row reason; the only reason was the
+   blanket lead-in sentence. Status at the time of the run: **still true** — and this record's
+   own writing flips row 1.6 to `[x]`, so the statement was about to apply to row 1.7 alone.
+   **Correction applied in this work unit (2026-09-17, supervisor):** row 1.7 (Closure) now
+   carries a per-row reason in both files — it cannot be checked off until this verification
+   slice is itself committed and reviewed — in the same style `wu3-contract.md` uses for its
+   own open row. No `[ ]` row in this table lacks a stated reason now.
+3. **The `6fe5314` claim in §1.4.** Claim text at `odd-doc-structure.md:565`. A fence-aware
+   scan of every mention of `6fe5314` across `odd/tasks/`: measured **12 prose lines, 14
+   occurrences, across 6 of the 8 files** (odd-doc-structure pair 4/4, repo-hygiene pair 2/2,
+   s1 pair 1/1; the wu2 pair has none; two lines carry the token twice) — every one is a
+   **prose line, none inside a fenced block**; there is no raw git output anywhere for it.
+   (The packet said "8 mentions"; the measured scan finds 12 lines / 14 occurrences, and the
+   record keeps the measured value — the claim's substance, all prose and none in a fence, is
+   unchanged.) `git show 6fe5314` confirms the commit exists: subject `docs(odd): close the
+   S1 residue list and regenerate the Spanish copies`, 4 files, **+562/−86**. Status:
+   **still true — no raw output recorded.** Not corrected: the claim is accepted evidence, and
+   the feature's `## Out of scope` forbids rewriting accepted evidence.
+4. **The wu2 `## Closure` "Eighteen commits on `feat/wu2-data-model`, none pushed".** Measured
+   today: `git rev-list --count 1c73e4c..2a62fa7` → **20**; `git rev-list --count
+   1c73e4c..2a62fa7^` → **19**; the tracking commit `627979d` is in the range, so
+   20 − `627979d` − `2a62fa7` = **18**, matching only under that reconciliation. Push state:
+   `git rev-parse feat/wu2-data-model` = `git rev-parse origin/feat/wu2-data-model` =
+   `2a62fa7…`, in sync; reflog shows `2a62fa7 refs/remotes/origin/feat/wu2-data-model@{2026-09-17
+   16:33:29 -0500}: update by push`, and the commit's author date is `16:31:01 -0500`.
+   Status: **"eighteen" only under that reconciliation; "none pushed" is false today** — the
+   branch has been on `origin` since 2026-09-17 16:33, about two and a half minutes after the
+   sentence was authored. The `## Closure` text is **left as accepted evidence, deliberately
+   not rewritten** (the feature's own `## Out of scope` forbids rewriting accepted evidence),
+   and this entry is where the divergence is now measured and visible.
+
+**Prose proof.** — this unit's diff, measured from the working tree at `373598a`. The two
+diff blocks below are capture-time values by design (the counts include the record's own
+lines — the §1.1 re-measure mechanism — plus the wu2 mirror's token line, Correction 1),
+so they are true at the moment of capture and were re-measured after the last edit; if a
+recorded digit differed from the final measured state, only the digits inside this block
+were corrected, then the pair hash was re-run and its prose value updated to match.
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 312 ++++++++++++++++++++++++++++++++++++--
+ odd/tasks/odd-doc-structure.md    | 295 +++++++++++++++++++++++++++++++++--
+ odd/tasks/wu2-data-model.es.md    |   2 +-
+ 3 files changed, 590 insertions(+), 19 deletions(-)
+
+$ git diff --numstat 373598a
+303	9	odd/tasks/odd-doc-structure.es.md
+286	9	odd/tasks/odd-doc-structure.md
+1	1	odd/tasks/wu2-data-model.es.md
+
+add+del total for this slice: 609 (EN=286, ES=305; ES = the odd-doc mirror's 303 plus the wu2 mirror's 2)
+
+$ git diff --name-only
+odd/tasks/odd-doc-structure.es.md
+odd/tasks/odd-doc-structure.md
+odd/tasks/wu2-data-model.es.md
+```
+
+**On the running count.** Slices 1.1–1.3 stay anchored to their commits (`96f03f6..ad8b122`
+= 1054), slice 1.3a keeps its recorded count against `ad8b122` (545), slice 1.4 is
+re-anchored (`c96dd3d..64177be` = 390, in §1.5), and slice 1.5 is now commit-anchored too:
+`64177be..373598a` = 769 (EN=376, ES=393), reproducing its recorded working-tree total
+exactly. This slice (1.6) has no commit yet, so its count is the working-tree measurement
+above (`git diff --numstat 373598a`), which includes this record's own lines. No
+commit-anchored total is claimed for it — the anchor is the working tree until the work unit
+lands.
+
+**What surprised me.**
+
+1. **The check-4 negative control only worked with an exact injection.** The verifier's first
+   two attempts did not land (the chosen word was not inside any fence; then the matcher
+   required a bare `` `^```$` `` line while the real opening fence is `` ```bash ``) — the
+   negative control that is recorded is the one that actually failed the pair comparison.
+2. **The section-bounded scan is the third load-bearing bound this feature had to learn.**
+   §1.4's pointer scan needed its bound against `### D1`–`### D4`; §1.5's needed its census
+   bound against the wu2 duplicates; check 2 needs both at once, plus the three-name
+   calibration for the Spanish mirrors.
+3. **The Spanish mirrors do not even agree on their own evidence-log heading name.**
+   s1/repo-hygiene use `## Log de evidencia`; wu2/wu3 use `## Registro de evidencia`. The
+   English documents all use `## Evidence log`. Nothing in the feature before this check had
+   forced the mirrors to agree.
+4. **Check 3 passes under the strict reading and would pass under the lenient one even when
+   stripped** — the same class as the repository's own recorded defect D1 — so the record
+   claims the strict result and shows the lenient one instead of hiding either.
+5. **Two packet figures did not reproduce and are recorded as measured:** "13 `### `
+   headings" in `s1-foundation.md` (the file measures 14 whole-file, 8 in the evidence
+   region) and "8 mentions of `6fe5314`" (12 lines / 14 occurrences across 6 files). The
+   substance of both checks is unchanged by the corrected counts.
+
+This pair cannot state its own hash inside its own fences without circularity — §1.3a, §1.4
+and §1.5 record the same constraint. Measured at the end of this entry, after the last fenced
+edit (and re-measured after the digit-only correction to the prose-proof block above, which
+is a fenced edit): `awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` →
+`4237ab09184eea92c277668b894b7651`, and the same command on `odd-doc-structure.es.md` →
+`4237ab09184eea92c277668b894b7651` — identical.
+
+The wu2 pair's hash is unaffected by Correction 1 — the edit is outside its fences — and was
+re-measured after the token change to confirm it still matches: `9f41d0d28cb00bb828a2ac48773c69b5`
+in both files.
+
 ## RDD conformance
 
 A section because the supervisor made an explicit decision about this feature's candidates on
@@ -1010,4 +1287,4 @@ A section because the supervisor made an explicit decision about this feature's 
 
 ## Next step
 
-Run task 1.6 (verification across all 8 documents), then 1.7 (closure).
+Run task 1.7 (closure).
