@@ -7,8 +7,10 @@
 
 **Workflow:** Organic Driven Development (ODD).
 **Fuente de verdad de los requisitos:** `openspec/changes/audio-extract-vertical-slice/` (intacto).
-**Estado:** `en curso` — 1.1 a 1.4 completas con evidencia registrada. Ver *Defectos* (D1–D4) y el
-*Registro de revisión del supervisor*.
+**Estado:** `closed` — las cuatro tareas 1.1–1.4 llevan evidencia registrada; la lista de
+residuos de más abajo se re-midió y se cerró en la feature que le sigue, `repo-hygiene` (commit
+`6fe5314`, 2026-09-17); y el tip de esta feature, `9eb288b`, es ancestro de `origin/main`. Ver
+*Defectos* (D1–D4) y el *Registro de revisión del supervisor*.
 
 ---
 
@@ -207,6 +209,31 @@ Cada item de abajo se re-midió el 2026-09-17 dentro de la feature que le sigue,
   rechazó el nombre de archivo; cada variable tiene un default, documentado acá y en
   `docker/compose.yaml`).
 
+## Restricciones (no negociables)
+
+- **Strict TDD.** Modo `strict`; fuente `openspec/config.yaml:58` (`strict_tdd: true`); runner las dos
+  gates: `pnpm --filter api --fail-if-no-match run test` (api) y
+  `uv run --project workers/media pytest workers/media/tests -q` (worker).
+
+## Delivery
+
+Registrado el 2026-09-17, medido retrospectivamente desde los commits, no estimado a la creación —
+esta feature es anterior al campo.
+
+- **Strategy:** `single-pr`, retrospectivo. La etiqueta es el vocabulario más cercano, pero la verdad
+  medida es que nunca existió una branch ni un pull request: los cuatro commits de este slice fueron
+  directo a `main` y se pushearon hasta `9eb288b`, que es ancestro de `origin/main`. Verificado: no
+  existe ninguna branch `s1-foundation` (local ni remota) y `9eb288b` es ancestro de `origin/main`.
+- **Forecast:** +1934 líneas autoradas cambiadas (adiciones más deleciones), medidas
+  retrospectivamente con `git log b05afcd..9eb288b --numstat`, excluyendo `pnpm-lock.yaml`, rutas
+  `generated` y archivos `.lock`; desglose +666 código/tests, +644 documentos en inglés, +624 espejo
+  en español. Salida cruda y descomposición por archivo en `odd-doc-structure.md` §1.4.
+- **Slice boundaries:** ninguna, porque no se usaron. El trabajo es lineal sobre `main`: los cuatro
+  commits del slice — `9eb288b` (historial de git y registro de fin de línea) · `ab47532` (stack
+  local con docker) · `9d05ebd` (scaffold del workspace) · `892f706` (feature tracking) — fueron
+  directo a `main` y se pushearon; no existe ninguna branch `s1-foundation` (local ni remota) y
+  `9eb288b` es ancestro de `origin/main`.
+
 ---
 
 ## Tareas
@@ -344,6 +371,17 @@ el control negativo sale non-zero.
 sale `1`; el filtro real sin base sale `1`). Salida cruda en el log de evidencia.
 
 **Rollback:** borrar `apps/`, `workers/`, `contracts/`, `docker/` y los manifiestos de la raíz.
+
+## Progress
+
+El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada de esa tarea.
+
+| ID | Tarea | Estado | Evidencia |
+| --- | --- | --- | --- |
+| 1.1 | RED: escribir los dos tests de harness y verlos fallar | `[x]` | §1.1 |
+| 1.2 | Scaffold del workspace | `[x]` | §1.2 |
+| 1.3 | Contenedores, volúmenes y entorno | `[x]` | §1.3 |
+| 1.4 | GREEN: registrar la evidencia | `[x]` | §1.4 |
 
 ---
 
@@ -647,3 +685,12 @@ cambio propio, no un flag.
   `design/spike-sandbox-namespaces.md` y `design/adr-0002-queue-mechanism.md`.
 - Todo lo posterior a WU-1 (modelo de datos, contrato, ports, máquina de estados). Está trackeado en
   el `tasks.md` del SDD y se va a re-planificar como features ODD de a una.
+
+## Next step
+
+Ninguno — no queda trabajo sobre este documento: la feature está cerrada (las cuatro tareas
+1.1–1.4 llevan evidencia registrada; la lista de residuos de más arriba se re-midió y se cerró en
+`repo-hygiene`; el tip `9eb288b` es ancestro de `origin/main`). Los hilos abiertos viven en otro
+lado: las dos decisiones diferidas del *Fuera de alcance* de `repo-hygiene.md` — adoptar knip
+(con el hallazgo del binario no listado `uv`) y la configuración ausente de ESLint — pertenecen al
+supervisor.

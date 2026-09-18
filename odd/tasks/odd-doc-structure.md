@@ -102,7 +102,14 @@ has no precedent anywhere, including upstream.
   three slices, and the two remaining document pairs (1.4, 1.5) and the verification slice
   (1.6) are still to come. The base stays §1.1's hard-won lesson, the branch point and not the
   previous feature's tip: a range starting at `2a62fa7` would swallow the four `wu3-contract`
-  commits, ancestors of this branch.
+  commits, ancestors of this branch. Slice 1.4, the slice this bullet is being updated by, has no
+  commit yet, so nothing about it is anchored to one: its own lines are counted against the
+  working tree at `c96dd3d` with `git diff --numstat c96dd3d` — raw output and totals in §1.4;
+  that count includes the record's own lines (the §1.1 re-measure mechanism). Slices 1.1–1.3
+  keep their commit anchor (`96f03f6..ad8b122` = 1054, above) and slice 1.3a's own unit keeps its
+  recorded count against `ad8b122` (545, in §1.3a). A commit-anchored total for slice 1.4 would
+  be a claim about a commit that does not exist yet; the anchor here is the working tree until
+  the work unit lands, and then the commit becomes the anchor.
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -199,7 +206,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.2 | `wu3-contract.md` + mirror | `[x]` | §1.2 |
 | 1.3 | `repo-hygiene.md` + mirror | `[x]` | §1.3 |
 | 1.3a | Correct the §1.1 formula, re-anchor the running count, record the RDD decision | `[x]` | §1.3a |
-| 1.4 | `s1-foundation.md` + mirror | `[ ]` | — |
+| 1.4 | `s1-foundation.md` + mirror | `[x]` | §1.4 |
 | 1.5 | `wu2-data-model.md` + mirror | `[ ]` | — |
 | 1.6 | Verification across all 8 documents | `[ ]` | — |
 | 1.7 | Closure | `[ ]` | — |
@@ -549,6 +556,136 @@ documentation lines). The ES mirror's `## Next step` had drifted before this uni
 chain-strategy question and task 1.2 — and was regenerated to mirror the English, which is where
 that heading now reads.
 
+### 1.4 — `s1-foundation.md` and its Spanish mirror (2026-09-17)
+
+The four structures added to both files, and the `Status` line corrected — it said `in progress`
+about a feature that is finished: all four tasks 1.1–1.4 carry evidence sections in the same
+document, the residue list was closed by the follow-up feature `repo-hygiene` (commit `6fe5314`),
+and this feature's tip `9eb288b` is an ancestor of `origin/main`. The rest of the line (the
+Spanish-copy pointer and the Defects / Supervisor review log pointer) is untouched. Task headings
+kept their text; state lives only in the `## Progress` table. The checks below are the checks
+task 1.6 will re-run across all eight documents, run here on both pairs this unit touches, raw:
+
+```text
+$ for f in s1-foundation.md s1-foundation.es.md odd-doc-structure.md odd-doc-structure.es.md; do
+    printf '%s: constraints=%s delivery=%s progress=%s next=%s\n' "$f" \
+      "$(grep -c '^## Constraints (non-negotiable)\|^## Restricciones (no negociables)' odd/tasks/$f)" \
+      "$(grep -c '^## Delivery$' odd/tasks/$f)" "$(grep -c '^## Progress$' odd/tasks/$f)" \
+      "$(grep -c '^## Next step$' odd/tasks/$f)"; done
+s1-foundation.md: constraints=1 delivery=1 progress=1 next=1
+s1-foundation.es.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.es.md: constraints=1 delivery=1 progress=1 next=1
+
+$ for f in odd/tasks/s1-foundation.md odd/tasks/s1-foundation.es.md odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+s1-foundation.md: §1.1 OK
+s1-foundation.md: §1.2 OK
+s1-foundation.md: §1.3 OK
+s1-foundation.md: §1.4 OK
+s1-foundation.es.md: §1.1 OK
+s1-foundation.es.md: §1.2 OK
+s1-foundation.es.md: §1.3 OK
+s1-foundation.es.md: §1.4 OK
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.md: §1.4 OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+odd-doc-structure.es.md: §1.4 OK
+
+$ for f in odd/tasks/s1-foundation.md odd/tasks/s1-foundation.es.md; do
+    echo "== $f"
+    awk '/^## /{ev=0} /^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' "$f" | sort | uniq -c
+  done
+== odd/tasks/s1-foundation.md
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+== odd/tasks/s1-foundation.es.md
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+
+$ awk '/^```/{f=!f;next} f' odd/tasks/s1-foundation.md | md5sum
+8d954644a76f8076f6367e059d56d6a0  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/s1-foundation.es.md | md5sum
+8d954644a76f8076f6367e059d56d6a0  -      # identical
+
+$ git log b05afcd..9eb288b --numstat | grep -v '^$' | grep -v '^commit ' | grep -v '^Author' | grep -v '^Date' | grep -v '^    ' | awk -v R="b05afcd..9eb288b" '$3 !~ /pnpm-lock\.yaml$/ && $3 !~ /generated/ && $3 !~ /\.lock$/ { if ($3 ~ /\.es\.md$/) { addes+=$1+$2; netes+=$1-$2 } else if ($3 ~ /\.md$/) { adden+=$1+$2; neten+=$1-$2 } else { addcode+=$1+$2; netcode+=$1-$2 } } END { printf "=== %s ===\nadd+del total: %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\nnet (add-del): %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\n", R, addcode+adden+addes, addcode, adden, addes, netcode+neten+netes, netcode, neten, netes }'
+=== b05afcd..9eb288b ===
+add+del total: 1934 (code/tests=666, Docs EN=644, Docs ES=624)
+net (add-del): 1930 (code/tests=666, Docs EN=642, Docs ES=622)
+
+$ git branch -a --list '*s1-foundation*' | grep . || echo "no s1-foundation branch (local or remote)"
+no s1-foundation branch (local or remote)
+
+$ git merge-base --is-ancestor 9eb288b origin/main && echo "9eb288b is an ancestor of origin/main; origin/main is $(git rev-parse --short origin/main)"
+9eb288b is an ancestor of origin/main; origin/main is 1c73e4c
+```
+
+This pair cannot state its hash inside its own fences without circularity — §1.3a records
+the same constraint. Measured at the end of this entry, after the last fenced edit:
+`awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `b1ee203a829db94b174fddd407974dd5`, and the
+same command on `odd-doc-structure.es.md` → `b1ee203a829db94b174fddd407974dd5` — identical.
+
+**What surprised me.**
+
+1. **The pointer scan needed a section bound to be honest.** The §1.3-era one-liner
+   (`awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}'`) counts the
+   `### D1`–`### D4` headings too, because in `s1-foundation` the *Defects* sections come after
+   the evidence log. The unbounded scan returns 1.1, 1.2, 1.3, 1.4, D1, D2, D3, D4 in both
+   files; the bounded scan above (every `## ` heading resets the guard) returns exactly 1.1–1.4.
+   The reported scan is the section-bounded one.
+2. **The pair-hash check did not move for the s1 pair.** The pair already held many fenced
+   blocks and this unit's edits added none, so the hash is unchanged (`8d954644…`) and still
+   identical across the pair. Not a vacuous pass — the check compares actual command-output
+   blocks and would fail if a mirror edit drifted; here nothing inside the fences changed.
+3. **The two diff blocks below are capture-time values by design.** The counts include the
+   record's own lines (the §1.1 re-measure mechanism), so they are true at the moment of
+   capture and move only if the record is edited again before commit.
+
+**Prose proof.** `git diff --stat` (this work unit, uncommitted) and the unit's own numstat
+against the working tree:
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 148 +++++++++++++++++++++++++++++++++++++-
+ odd/tasks/odd-doc-structure.md    | 143 +++++++++++++++++++++++++++++++++++-
+ odd/tasks/s1-foundation.es.md     |  51 +++++++++++++-
+ odd/tasks/s1-foundation.md        |  48 ++++++++++++-
+ 4 files changed, 381 insertions(+), 9 deletions(-)
+
+$ git diff --numstat c96dd3d
+145	3	odd/tasks/odd-doc-structure.es.md
+140	3	odd/tasks/odd-doc-structure.md
+49	2	odd/tasks/s1-foundation.es.md
+47	1	odd/tasks/s1-foundation.md
+
+add+del total for this slice: 390 (EN=191, ES=199)
+```
+
+The working diff touches only the four document files, and a read of the diff shows each change
+is one of: the four structures added (constraints + delivery + progress + next step), the
+`Status` line corrected, or the bookkeeping in this document. Nothing else was rewritten.
+
+**On the running count.** Slices 1.1–1.3 stay anchored to their commits (`96f03f6..ad8b122` =
+1054) and slice 1.3a's own unit keeps its recorded count against `ad8b122` (545); this slice has
+no commit yet, so its count is the working-tree measurement above (`git diff --numstat c96dd3d`),
+which includes this record's own lines. No commit-anchored total is claimed for it — the anchor
+is the working tree until the work unit lands.
+
 ## RDD conformance
 
 A section because the supervisor made an explicit decision about this feature's candidates on
@@ -588,4 +725,4 @@ A section because the supervisor made an explicit decision about this feature's 
 
 ## Next step
 
-Run task 1.4 (`s1-foundation.md` and its Spanish mirror), then 1.5, and the verification in 1.6.
+Run task 1.5 (`wu2-data-model.md` and its Spanish mirror), then the verification in 1.6.

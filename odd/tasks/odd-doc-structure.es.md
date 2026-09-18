@@ -109,7 +109,14 @@ entrega no tiene precedente en ningún lado, upstream incluido.
   de documentos restantes (1.4, 1.5) y el slice de verificación (1.6). La base sigue siendo la
   lección dura de §1.1, el punto de bifurcación y no el tip de la feature anterior: un rango
   que arranca en `2a62fa7` se tragaría los cuatro commits de `wu3-contract`, ancestros
-  de esta branch.
+  de esta branch. El slice 1.4, el que este bullet está actualizando, no tiene commit todavía,
+  así que nada de lo suyo está anclado a uno: sus propias líneas se cuentan contra el árbol de
+  trabajo en `c96dd3d` con `git diff --numstat c96dd3d` — salida cruda y totales en §1.4; ese
+  conteo incluye las líneas del propio registro (el mecanismo de re-medición de §1.1). Los slices
+  1.1–1.3 mantienen su ancla de commits (`96f03f6..ad8b122` = 1054, arriba) y el work unit propio
+  de 1.3a mantiene su conteo registrado contra `ad8b122` (545, en §1.3a). Un total de slice 1.4
+  anclado a commits sería una afirmación sobre un commit que todavía no existe; acá el ancla es el
+  árbol de trabajo hasta que el work unit aterrice, y entonces el commit pasa a ser el ancla.
 - **Fronteras de slice:** cinco slices, uno por par de documentos (un documento en inglés más su
   espejo español), apilados sobre `feat/odd-doc-structure` e integrados al final. El slice 1 es el par
   de este mismo documento, del work-unit 1.1 (`92c5fb4`); los slices 2–5 son las tareas 1.2–1.5. El
@@ -213,7 +220,7 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | 1.2 | `wu3-contract.md` + espejo | `[x]` | §1.2 |
 | 1.3 | `repo-hygiene.md` + espejo | `[x]` | §1.3 |
 | 1.3a | Corregir la fórmula de §1.1, re-anclar el conteo corriente, registrar la decisión de RDD | `[x]` | §1.3a |
-| 1.4 | `s1-foundation.md` + espejo | `[ ]` | — |
+| 1.4 | `s1-foundation.md` + espejo | `[x]` | §1.4 |
 | 1.5 | `wu2-data-model.md` + espejo | `[ ]` | — |
 | 1.6 | Verificación sobre los 8 documentos | `[ ]` | — |
 | 1.7 | Cierre | `[ ]` | — |
@@ -568,6 +575,141 @@ sostiene con las dos fórmulas (~49% de las líneas de documentación de cada pa
 del espejo español se había desviado antes de esta unidad — nombraba la pregunta de estrategia de
 cadena y la tarea 1.2 — y se regeneró para espejar el inglés, que es donde ese encabezado ahora lee.
 
+### 1.4 — `s1-foundation.md` y su espejo español (2026-09-17)
+
+Las cuatro estructuras agregadas a los dos archivos, y la línea de `Status` corregida — decía
+`in progress` sobre una feature que está terminada: las cuatro tareas 1.1–1.4 llevan secciones de
+evidencia en el mismo documento, la lista de residuos se cerró en la feature que le sigue,
+`repo-hygiene` (commit `6fe5314`), y el tip de esta feature, `9eb288b`, es ancestro de
+`origin/main`. El resto de la línea (el puntero a la copia en español y el puntero a *Defectos* /
+*Registro de revisión del supervisor*) queda intacto. Los encabezados de tarea conservan su texto;
+el estado vive sólo en la tabla `## Progress`. Los checks de abajo son los que la tarea 1.6 va a
+re-correr sobre los ocho documentos, corridos acá sobre los dos pares que toca esta unidad,
+crudos:
+
+```text
+$ for f in s1-foundation.md s1-foundation.es.md odd-doc-structure.md odd-doc-structure.es.md; do
+    printf '%s: constraints=%s delivery=%s progress=%s next=%s\n' "$f" \
+      "$(grep -c '^## Constraints (non-negotiable)\|^## Restricciones (no negociables)' odd/tasks/$f)" \
+      "$(grep -c '^## Delivery$' odd/tasks/$f)" "$(grep -c '^## Progress$' odd/tasks/$f)" \
+      "$(grep -c '^## Next step$' odd/tasks/$f)"; done
+s1-foundation.md: constraints=1 delivery=1 progress=1 next=1
+s1-foundation.es.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.md: constraints=1 delivery=1 progress=1 next=1
+odd-doc-structure.es.md: constraints=1 delivery=1 progress=1 next=1
+
+$ for f in odd/tasks/s1-foundation.md odd/tasks/s1-foundation.es.md odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+s1-foundation.md: §1.1 OK
+s1-foundation.md: §1.2 OK
+s1-foundation.md: §1.3 OK
+s1-foundation.md: §1.4 OK
+s1-foundation.es.md: §1.1 OK
+s1-foundation.es.md: §1.2 OK
+s1-foundation.es.md: §1.3 OK
+s1-foundation.es.md: §1.4 OK
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.md: §1.4 OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+odd-doc-structure.es.md: §1.4 OK
+
+$ for f in odd/tasks/s1-foundation.md odd/tasks/s1-foundation.es.md; do
+    echo "== $f"
+    awk '/^## /{ev=0} /^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' "$f" | sort | uniq -c
+  done
+== odd/tasks/s1-foundation.md
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+== odd/tasks/s1-foundation.es.md
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+
+$ awk '/^```/{f=!f;next} f' odd/tasks/s1-foundation.md | md5sum
+8d954644a76f8076f6367e059d56d6a0  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/s1-foundation.es.md | md5sum
+8d954644a76f8076f6367e059d56d6a0  -      # identical
+
+$ git log b05afcd..9eb288b --numstat | grep -v '^$' | grep -v '^commit ' | grep -v '^Author' | grep -v '^Date' | grep -v '^    ' | awk -v R="b05afcd..9eb288b" '$3 !~ /pnpm-lock\.yaml$/ && $3 !~ /generated/ && $3 !~ /\.lock$/ { if ($3 ~ /\.es\.md$/) { addes+=$1+$2; netes+=$1-$2 } else if ($3 ~ /\.md$/) { adden+=$1+$2; neten+=$1-$2 } else { addcode+=$1+$2; netcode+=$1-$2 } } END { printf "=== %s ===\nadd+del total: %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\nnet (add-del): %d (code/tests=%d, Docs EN=%d, Docs ES=%d)\n", R, addcode+adden+addes, addcode, adden, addes, netcode+neten+netes, netcode, neten, netes }'
+=== b05afcd..9eb288b ===
+add+del total: 1934 (code/tests=666, Docs EN=644, Docs ES=624)
+net (add-del): 1930 (code/tests=666, Docs EN=642, Docs ES=622)
+
+$ git branch -a --list '*s1-foundation*' | grep . || echo "no s1-foundation branch (local or remote)"
+no s1-foundation branch (local or remote)
+
+$ git merge-base --is-ancestor 9eb288b origin/main && echo "9eb288b is an ancestor of origin/main; origin/main is $(git rev-parse --short origin/main)"
+9eb288b is an ancestor of origin/main; origin/main is 1c73e4c
+```
+
+Este par no puede declarar su propio hash dentro de sus propios cercos sin circularidad — §1.3a
+registra la misma restricción. Medido al final de esta entrada, después de la última edición de
+cercos: `awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `b1ee203a829db94b174fddd407974dd5`, y el
+mismo comando sobre `odd-doc-structure.es.md` → `b1ee203a829db94b174fddd407974dd5` — idéntico.
+
+**Lo que me sorprendió.**
+
+1. **El escaneo de punteros necesitó un límite de sección para ser honesto.** El one-liner de la
+   era de §1.3 (`awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}'`)
+   cuenta también los encabezados `### D1`–`### D4`, porque en `s1-foundation` las secciones de
+   *Defectos* vienen después del log de evidencia. El escaneo sin límite devuelve 1.1, 1.2, 1.3,
+   1.4, D1, D2, D3, D4 en los dos archivos; el escaneo con límite (cada encabezado `## ` resetea
+   el guard) devuelve exactamente 1.1–1.4. El escaneo reportado es el delimitado por sección.
+2. **El chequeo de hash de pares no se movió para el par de s1.** El par ya tenía muchos bloques
+   cercados y las ediciones de esta unidad no agregaron ninguno, así que el hash quedó igual
+   (`8d954644…`) y sigue idéntico entre los dos archivos. No es un pase vacuo — el chequeo
+   compara bloques reales de salida de comandos y fallaría si una edición del espejo derivara;
+   acá nada dentro de los cercos cambió.
+3. **Los dos bloques de diff de abajo son valores de captura por diseño.** Los conteos incluyen
+   las líneas del propio registro (el mecanismo de re-medición de §1.1), así que son verdaderos
+   al momento de capturarlos y sólo se mueven si el registro se edita de nuevo antes del commit.
+
+**Prueba de prosa.** `git diff --stat` (este work unit, sin commitear) y el numstat propio de la
+unidad contra el árbol de trabajo:
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 148 +++++++++++++++++++++++++++++++++++++-
+ odd/tasks/odd-doc-structure.md    | 143 +++++++++++++++++++++++++++++++++++-
+ odd/tasks/s1-foundation.es.md     |  51 +++++++++++++-
+ odd/tasks/s1-foundation.md        |  48 ++++++++++++-
+ 4 files changed, 381 insertions(+), 9 deletions(-)
+
+$ git diff --numstat c96dd3d
+145	3	odd/tasks/odd-doc-structure.es.md
+140	3	odd/tasks/odd-doc-structure.md
+49	2	odd/tasks/s1-foundation.es.md
+47	1	odd/tasks/s1-foundation.md
+
+add+del total for this slice: 390 (EN=191, ES=199)
+```
+
+El diff de trabajo toca sólo los cuatro archivos de documentos, y una lectura del diff muestra que
+cada cambio es una de estas cosas: las cuatro estructuras agregadas (constraints + delivery +
+progress + next step), la línea de `Status` corregida, o el bookkeeping de este documento. Nada
+más se reescribió.
+
+**Sobre el conteo corriente.** Los slices 1.1–1.3 siguen anclados a sus commits
+(`96f03f6..ad8b122` = 1054) y el work unit propio de 1.3a mantiene su conteo registrado contra
+`ad8b122` (545); este slice no tiene commit todavía, así que su conteo es la medición del árbol de
+trabajo de arriba (`git diff --numstat c96dd3d`), que incluye las líneas de este registro. No se
+reclama ningún total anclado a commits — el ancla es el árbol de trabajo hasta que el work unit
+aterrice.
+
 ## Conformidad con el RDD
 
 Una sección porque el supervisor tomó una decisión explícita sobre los candidatos de esta feature
@@ -609,4 +751,4 @@ el 2026-09-17, y la decisión se registra acá en lugar de quedar implícita en 
 
 ## Next step
 
-Correr la tarea 1.4 (`s1-foundation.md` y su espejo español), después la 1.5, y la verificación en 1.6.
+Correr la tarea 1.5 (`wu2-data-model.md` y su espejo español), y después la verificación en 1.6.

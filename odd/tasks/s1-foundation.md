@@ -2,7 +2,9 @@
 
 **Workflow:** Organic Driven Development (ODD).
 **Source of truth for requirements:** `openspec/changes/audio-extract-vertical-slice/` (kept intact).
-**Status:** `in progress` — 1.1–1.4 complete with recorded evidence. Spanish reading copy:
+**Status:** `closed` — all four tasks 1.1–1.4 carry recorded evidence; the residue list below was
+re-measured and closed by the follow-up feature `repo-hygiene` (commit `6fe5314`, 2026-09-17); and
+this feature's tip `9eb288b` is an ancestor of `origin/main`. Spanish reading copy:
 `s1-foundation.es.md`. See *Defects* (D1–D4) and the *Supervisor review log*.
 
 ---
@@ -196,6 +198,31 @@ ambiguous.
   section above. Dropped by supervisor decision on 2026-09-16 (the path policy refused the
   filename; every variable has a default, documented here and in `docker/compose.yaml`).
 
+## Constraints (non-negotiable)
+
+- **Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the two
+  gates: `pnpm --filter api --fail-if-no-match run test` (api) and
+  `uv run --project workers/media pytest workers/media/tests -q` (worker).
+
+## Delivery
+
+Recorded 2026-09-17, measured retrospectively from the commits, not estimated at creation — this
+feature predates the field.
+
+- **Strategy:** `single-pr`, retrospective. The label is the nearest vocabulary, but the measured
+  truth is that no branch or pull request ever existed: the four commits of this slice went directly
+  onto `main` and were pushed through `9eb288b`. Verified: no `s1-foundation` branch exists anywhere
+  (local or remote) and `9eb288b` is an ancestor of `origin/main`.
+- **Forecast:** +1934 authored changed lines (additions plus deletions), measured retrospectively
+  with `git log b05afcd..9eb288b --numstat`, excluding `pnpm-lock.yaml`, `generated` paths and
+  `.lock` files; split +666 code/tests, +644 English docs, +624 Spanish mirror. Raw output and the
+  per-file decomposition are at `odd-doc-structure.md` §1.4.
+- **Slice boundaries:** none, because none were used. The work is `main`-linear: the four commits of
+  the slice — `9eb288b` (git history and line-ending record) · `ab47532` (local docker stack) ·
+  `9d05ebd` (workspace scaffold) · `892f706` (feature tracking) — went directly onto `main` and were
+  pushed; no `s1-foundation` branch exists (local or remote) and `9eb288b` is an ancestor of
+  `origin/main`.
+
 ---
 
 ## Tasks
@@ -328,6 +355,17 @@ and the negative control holds in both directions (`--filter no-such-project` ex
 filter with no database exits `1`). Raw output in the evidence log.
 
 **Rollback:** delete `apps/`, `workers/`, `contracts/`, `docker/` and the root manifests.
+
+## Progress
+
+State is `[x]` only where the evidence log holds observed proof for that task.
+
+| ID | Task | State | Evidence |
+| --- | --- | --- | --- |
+| 1.1 | RED: write the two harness tests and watch them fail | `[x]` | §1.1 |
+| 1.2 | Scaffold the workspace | `[x]` | §1.2 |
+| 1.3 | Containers, volumes, environment | `[x]` | §1.3 |
+| 1.4 | GREEN: record the evidence | `[x]` | §1.4 |
 
 ---
 
@@ -629,3 +667,11 @@ denial means moving the acceptance into a container first — a change of its ow
   `design/adr-0002-queue-mechanism.md`.
 - Everything after WU-1 (data model, contract, ports, state machine). Tracked in the SDD
   `tasks.md` and to be re-planned as ODD features one at a time.
+
+## Next step
+
+None — no work remains on this document: the feature is closed (all four tasks 1.1–1.4 carry
+recorded evidence; the residue list above was re-measured and closed by `repo-hygiene`; tip
+`9eb288b` is an ancestor of `origin/main`). The still-open threads live elsewhere: the two deferred
+decisions from `repo-hygiene.md` *Out of scope* — adopting knip (with the `uv` unlisted-binary
+finding) and the absent ESLint configuration — belong to the supervisor.
