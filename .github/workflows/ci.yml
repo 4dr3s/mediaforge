@@ -1,0 +1,152 @@
+---
+# CI for the delivery policy (odd/tasks/repo-delivery-policy.md). Four jobs,
+# each invoking a command the repository already documents — CI runs the same
+# entrypoints as the Makefile, never a reimplementation. No shellcheck (zero
+# shell scripts) and no eslint (not configured): a gate over an empty set is
+# not a gate (defect D1).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # prisma7.config.ts reads process.env['DATABASE_URL'] with no default, so
+      # it is exported explicitly. The migration must land in the database the
+      # suites actually connect to (DATABASE_URL_TEST, default
+      # postgresql://postgres:postgres@localhost:5432/mediaforge_test).
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mediaforge_test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/mediaforge_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0  # the packageManager pin in package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Bring up Postgres and Redis
+        run: docker compose -f docker/compose.yaml up -d --wait postgres redis
+      - name: Ensure the test database exists
+        run: |
+          # init-test-db.sql runs only while the data directory is empty, so
+          # `mediaforge_test` appears on the first init and never again.
+          # Verify, do not assume.
+          exists=$(docker compose -f docker/compose.yaml exec -T postgres \
+            psql -U postgres -d mediaforge -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='mediaforge_test'")
+          if [ "$exists" != "1" ]; then
+            docker compose -f docker/compose.yaml exec -T postgres \
+              psql -U postgres -d mediaforge -c "CREATE DATABASE mediaforge_test"
+          fi
+      - name: Generate the Prisma client (fail-if-no-match is defect D1)
+        run: pnpm --filter api --fail-if-no-match exec prisma generate
+      - name: Apply migrations to the test database
+        run: pnpm --filter api --fail-if-no-match exec prisma migrate deploy
+      - name: Run the api suite
+        run: pnpm --filter api --fail-if-no-match run test
+
+  worker:
+    name: worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Same as the api job: migrate deploy reads DATABASE_URL from the shell.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mediaforge_test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/mediaforge_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0  # prisma migrate deploy runs from this workspace
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'  # pyproject pins >=3.11,<3.12; uv.lock ==3.11.*
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Sync the worker environment
+        run: uv sync --project workers/media --extra dev
+      - name: Bring up Postgres and Redis
+        run: docker compose -f docker/compose.yaml up -d --wait postgres redis
+      - name: Ensure the test database exists
+        run: |
+          exists=$(docker compose -f docker/compose.yaml exec -T postgres \
+            psql -U postgres -d mediaforge -tAc \
+            "SELECT 1 FROM pg_database WHERE datname='mediaforge_test'")
+          if [ "$exists" != "1" ]; then
+            docker compose -f docker/compose.yaml exec -T postgres \
+              psql -U postgres -d mediaforge -c "CREATE DATABASE mediaforge_test"
+          fi
+      - name: Apply migrations (the suites assert roles and tables)
+        run: pnpm --filter api --fail-if-no-match exec prisma migrate deploy
+      - name: Run the worker suite
+        run: uv run --project workers/media pytest workers/media/tests -q
+
+  # The two linters are pinned because a gate whose tool drifts is a gate whose
+  # meaning drifts: ruff 0.16.8 is the version whose caches this tree already
+  # carries (workers/media/.ruff_cache/), and yamllint 1.38.0 was chosen with
+  # the same measurement. A version bump is a deliberate decision, not a side
+  # effect. Both runs use the configuration that already exists in the
+  # repository; a rule failure is reported, never loosened to make CI green.
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: ruff check
+        run: uvx --from ruff==0.16.8 ruff check workers/media
+      - name: yamllint
+        # Every hand-written YAML file; pnpm-lock.yaml is excluded because it is
+        # machine-written (generated by pnpm), not hand-reviewed YAML.
+        run: uvx --from yamllint==1.38.0 yamllint -c .yamllint docker/compose.yaml .yamllint pnpm-workspace.yaml openspec/config.yaml .github
+
+  # Decision 1 of the policy: exactly one type:* label, and the head branch
+  # matching the type regex. Issue linkage is intentionally not validated.
+  # On a push to main there is no PR to validate, so the job logs and exits 0
+  # instead of failing.
+  policy:
+    name: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            if (!context.payload.pull_request) {
+              console.log('policy: push event, no PR to validate, skipping');
+              return;
+            }
+            const branch = context.payload.pull_request.head.ref;
+            const branchPattern = /^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)\/[a-z0-9._-]+$/;
+            const typeLabels = context.payload.pull_request.labels
+              .map((label) => label.name)
+              .filter((name) => name.startsWith('type:'));
+            let failed = false;
+            if (typeLabels.length !== 1) {
+              core.setFailed('policy: rule 1 - exactly one type:* label required, found ' +
+                typeLabels.length + ' (' + (typeLabels.join(', ') || 'none') + ')');
+              failed = true;
+            }
+            if (!branchPattern.test(branch)) {
+              core.setFailed('policy: rule 2 - branch "' + branch +
+                '" does not match ' + branchPattern);
+              failed = true;
+            }
+            if (!failed) {
+              console.log('policy: ok - branch "' + branch + '", label "' + typeLabels[0] + '"');
+            }

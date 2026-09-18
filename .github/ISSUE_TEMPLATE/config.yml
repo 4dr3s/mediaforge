@@ -1,0 +1,9 @@
+---
+# Issue template configuration. Blank issues are disabled so every issue starts
+# from a template, and questions are pointed at CONTRIBUTING.md instead of the
+# tracker: the issue tracker is for work with evidence, not for support.
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and support
+    url: https://github.com/4dr3s/mediaforge/blob/main/CONTRIBUTING.md
+    about: Questions are not issues. Read CONTRIBUTING.md for how to ask.

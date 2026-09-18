@@ -1,0 +1,39 @@
+---
+# Feature request template. This repository's documents always name the
+# non-goals, so the form asks for them explicitly. The default label
+# (type:feature) must exist on the remote for GitHub to accept the form.
+name: Feature request
+description: Propose a change with the problem stated before the solution.
+title: "feat: "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: The concrete problem this change solves; what is missing or broken today.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: The proposed change
+      description: What the change does, and the shape of the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else was evaluated, and why it was not chosen.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: What is out of scope
+      description: |-
+        The non-goals, named on purpose. A change whose boundaries are not
+        stated cannot be reviewed honestly; say what this proposal does not do.
+    validations:
+      required: true

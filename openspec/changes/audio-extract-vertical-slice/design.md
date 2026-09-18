@@ -135,6 +135,21 @@ from this ERD when the project is scaffolded, and only then does it become the a
 model. This section records the ERD, the per-table decisions, and the query paths each index
 serves.
 
+> **Amended 2026-09-17 (WU-2), after the model was built.** The schema now exists at
+> `apps/api/prisma/schema.prisma`, and building it surfaced three corrections the supervisor
+> approved: `attempts.error_class` and `outbox.event_type` became enum **types** instead of `text`
+> (`error_class` also carried a CHECK, which is now gone; `event_type` was plain text) — the same kind
+> of closed domain `jobs.state` already used an enum for, and Prisma *does* express enums, so §5's
+> wording to the contrary is corrected there — and
+> `submissions.client_id` was **removed** in favour of one globally unique `idempotency_key`. The
+> last one fixed a measured defect rather than a preference: `client_id` had no defined origin
+> anywhere, and because it was nullable, `unique (client_id, idempotency_key)` deduplicated nothing —
+> PostgreSQL treats NULLs as distinct, so two submissions with the same key and a NULL client were
+> both accepted, and C1's guarantee silently degraded into "create a second job". The ERD, the prose
+> and the query trace below now describe what the database actually enforces. `job_type` and both
+> `error_code` columns stay `text` on purpose: a registry key and an open taxonomy, where an enum
+> would force a migration per new value and duplicate the registry.
+
 ```mermaid
 erDiagram
     jobs ||--o{ job_inputs : "has inputs"
@@ -175,7 +190,7 @@ erDiagram
         timestamptz lease_expires_at "fencing token part 2"
         timestamptz started_at
         timestamptz ended_at "nullable; NULL = still held"
-        text error_class "nullable; retryable|non_retryable"
+        FailureClass error_class "enum; nullable: retryable|non_retryable"
         text error_code "nullable"
         timestamptz created_at
     }
@@ -183,8 +198,7 @@ erDiagram
     submissions {
         uuid id PK "uuidv7()"
         uuid job_id FK "-> jobs.id; unique"
-        text client_id "nullable; idempotency pair"
-        text idempotency_key "nullable; idempotency pair"
+        text idempotency_key "unique; NOT NULL"
         text creator_token_hash "sha256 of the token; token never stored"
         timestamptz created_at
     }
@@ -204,7 +218,7 @@ erDiagram
     outbox {
         uuid id PK "uuidv7()"
         uuid job_id FK "-> jobs.id"
-        text event_type "job.queued only"
+        OutboxEventType event_type "enum: job.queued only"
         jsonb payload "the versioned envelope"
         timestamptz published_at "nullable; NULL = unpublished"
         int attempts "relay publish attempts; observability"
@@ -213,8 +227,10 @@ erDiagram
 ```
 
 **Composite unique constraints (not expressible as a single Mermaid key):** `job_inputs
-(job_id, ordinal)`, `attempts (job_id, attempt_no)`, `submissions (client_id,
-idempotency_key)`, and `submissions (job_id)` (single-column, shown as `unique` above).
+(job_id, ordinal)`, `attempts (job_id, attempt_no)`, `submissions (idempotency_key)`, and
+`submissions (job_id)` (single-column, shown as `unique` above). The idempotency key is
+**globally unique**, not scoped to a client: without accounts there is no client identity to
+scope by, and a nullable scope column would silently stop the constraint from applying at all.
 **Partial index:** `outbox (published_at) WHERE published_at IS NULL` (the relay poll).
 `jobs.artifact_id` (primary artifact) and `jobs ||--o{ artifacts` (owned artifacts) are two
 distinct relationships: the owned edge is the `artifacts.job_id` FK; the primary edge is the
@@ -226,7 +242,7 @@ primary artifact, not enforced as exclusive).
 | `jobs` | one per job | `id` UUIDv7 (PK), `job_type`, `params` jsonb, `state` enum (six), `available_at`, `error_code`, `artifact_id` (nullable FK), timestamps |
 | `job_inputs` | one per declared input | `unique (job_id, ordinal)`, `declared_type`, `storage_key`, `display_name`, `byte_size` |
 | `attempts` | one per claim (real table, never a counter) | `unique (job_id, attempt_no)`, `lease_owner`, `lease_expires_at`, `started_at`, `ended_at`, `error_class` |
-| `submissions` | one per job (1:1) | `unique (client_id, idempotency_key)`, `unique (job_id)`, `creator_token_hash` |
+| `submissions` | one per job (1:1) | `unique (idempotency_key)` (global), `unique (job_id)`, `creator_token_hash` |
 | `artifacts` | one per artifact | `storage_key`, `byte_size`, `content_type`, `checksum`, `filename`, `expires_at` |
 | `outbox` | one per dispatch intent | `event_type`, `payload`, `published_at` (nullable), partial index |
 
@@ -259,7 +275,7 @@ is a download *response*, never a state (C6, C8).
 | T6/T7 fence | `UPDATE jobs ... WHERE id=? AND state='running' AND EXISTS(attempts ...)` | PK + `unique (job_id, attempt_no)` |
 | heartbeat | `UPDATE attempts ... WHERE job_id=? AND attempt_no=? AND lease_owner=? ...` | `unique (job_id, attempt_no)` |
 | auth (download/cancel/upload) | `SELECT creator_token_hash FROM submissions WHERE job_id=?` | `unique (job_id)` |
-| idempotency | `SELECT ... FROM submissions WHERE client_id=? AND idempotency_key=?` | `unique (client_id, idempotency_key)` |
+| idempotency | `SELECT ... FROM submissions WHERE idempotency_key=?` | `unique (idempotency_key)` |
 | download artifact | `SELECT ... FROM artifacts WHERE job_id=?` (or via `jobs.artifact_id` PK) | `@@index([jobId])` / PK |
 | relay poll | `SELECT ... FROM outbox WHERE published_at IS NULL ... FOR UPDATE SKIP LOCKED` | partial `(published_at) WHERE published_at IS NULL` |
 | job detail | `SELECT ... FROM jobs WHERE id=?` | PK |
@@ -324,11 +340,21 @@ No Python uuid generator enters the system.
 DDL authority. The Python worker is read-only on schema: it never emits
 `CREATE`/`ALTER`/`DROP`, and its SQL is reviewed against the generated migration. Any
 schema change is made by `prisma migrate` on the API side, then the worker's affected
-statements are updated in the same change. Constraints Prisma cannot express — the `state`
-enum type and the `CHECK (ordinal >= 1)`, `CHECK (attempt_no >= 1)`, `CHECK (error_class
-IN (...))` constraints, and the partial outbox index — are added by editing the generated
-migration SQL; that edited migration remains the single authority, and the worker never
-edits it.
+statements are updated in the same change. Constraints Prisma cannot express — the
+`CHECK (ordinal >= 1)`, `CHECK (attempt_no >= 1)` constraints, and the partial outbox index —
+are added by editing the generated migration SQL; that edited migration remains the single
+authority, and the worker never edits it.
+
+> **Amended 2026-09-17 (WU-2).** This paragraph listed the `state` enum type and a
+> `CHECK (error_class IN (...))` among the things Prisma cannot express. Both claims were wrong, and
+> building the model measured it: Prisma generates `CREATE TYPE` for an enum, and it did so for
+> `JobState`, `FailureClass` and `OutboxEventType`. `error_class` therefore became an enum type and
+> its CHECK is gone — which also removed a real hazard, because a CHECK can be written in a way that
+> forbids NULL on a column the ERD declares nullable, and a type cannot. The two surviving CHECKs, the
+> partial index and the roles/grants are the hand-edits that remain. (Worth stating precisely, because
+> an independent verifier caught the first draft of this note claiming the two CHECKs and the index
+> were "the only" hand-edits: they are not — the migration also carries the least-privilege roles and
+> their grants, as §3 requires.)
 
 **Prisma is the chosen ORM and the single migration owner** — that is a recorded design
 decision, not a scaffolding artifact. Its **instantiation is a scaffolding step**: this
@@ -337,6 +363,19 @@ file in this change**. When the project is scaffolded, the schema is written und
 `apps/api/prisma/schema.prisma` from the ERD in §3, and `prisma migrate` produces the first
 migration under `apps/api/prisma/migrations/`. Until then **the ERD in §3 is the authoritative
 model**, and no Prisma schema is presented as validated or authoritative.
+
+> **Amended 2026-09-17 (WU-2).** That step has happened. The schema now lives at
+> `apps/api/prisma/schema.prisma`, written from the ERD in §3, and the first migration is applied at
+> `apps/api/prisma/migrations/20260917205310_init/` — one file, hand-edited for the two CHECKs, the
+> partial index and the roles, exactly as this section requires. **The schema is now the authority**,
+> and §3's ERD was amended the same day to describe what the database enforces (three enum types and
+> one globally unique idempotency key). `prisma migrate diff` reports no drift between the two, so
+> "the ERD and the schema agree" is a checked statement rather than a claim.
+>
+> One more measured correction from the same step: Prisma 7 removed `datasource.url` from the schema
+> file, so the connection string lives in `apps/api/prisma7.config.ts`, and the generator is
+> `prisma-client` with an explicit output instead of `prisma-client-js`. Neither changes the decision
+> recorded here; both change the shape of the files that carry it.
 
 ---
 

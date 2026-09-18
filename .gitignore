@@ -7,6 +7,10 @@ build/
 *.log
 *.tsbuildinfo
 
+# Prisma 7 generates its client into the project instead of into node_modules
+# (`generator client { output = "../generated/prisma" }`). Generated code is not source.
+apps/api/generated/
+
 # Python
 .venv/
 __pycache__/

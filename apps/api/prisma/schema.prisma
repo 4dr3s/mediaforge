@@ -1,0 +1,211 @@
+// WU-2 — the authoritative data model, realized from `design.md` §3 (the ERD is the authority for
+// entities, columns, types, uniques and indexes) and §4 (UUID strategy).
+//
+// What this file does NOT contain, and why: two CHECK constraints (`ordinal >= 1`,
+// `attempt_no >= 1`) and the partial index
+// `outbox (published_at) WHERE published_at IS NULL` are not expressible in Prisma's schema
+// language. They are hand-edited into the generated migration, which stays the single DDL authority
+// (`design.md` §5). The `state`, `error_class` and `event_type` enums, contrary to §5's wording, **are**
+// expressible — Prisma has native enum blocks and generates `CREATE TYPE` — so they are declared here
+// rather than hand-added.
+//
+// Two modelling rules applied throughout, both to avoid inventing behaviour the design never
+// declared:
+//
+//   1. **Defaults are declared exactly where the design's own canonical SQL requires them, and
+//      nowhere else.** Two statements in `design.md` §6 insert rows without every NOT NULL column:
+//      `outbox` at line 355 omits `attempts` and `created_at`, and `attempts` at line 379 omits
+//      `created_at`. Those three defaults are therefore not invented — they are the only way the
+//      design's canonical SQL can run. Every other NOT NULL column is written explicitly by the code
+//      that owns it, so a forgotten value fails loudly instead of being papered over by a default.
+//   2. **`@db.Timestamptz(6)` is written on every timestamp column on purpose.** Prisma's implicit
+//      mapping for `DateTime` on PostgreSQL is `timestamp(3)` *without* time zone; the ERD requires
+//      `timestamptz` everywhere, and the difference is a silent timezone bug rather than an error.
+//   3. **Enums are for domains the design fixes; text is for keys and taxonomies that grow.**
+//      `state`, `error_class` and `event_type` are closed sets decided by the design, so they are
+//      enum types. `job_type` is a registry key (`contracts/job-types.json`) and `error_code` is an
+//      open taxonomy — the design's own `explore.md` anticipates new `error_code` values — so an enum
+//      there would force a migration per new job type or error code and duplicate the registry.
+//      The design used an enum for one closed domain and a CHECK for another; this file states the
+//      criterion so the next column is not decided by accident.
+//   4. **Idempotency is one globally unique key, not a `(client, key)` pair.** The pair needed a
+//      `client_id` whose origin the design never defined anywhere, and because it was nullable,
+//      PostgreSQL treats NULLs as distinct: measured on the migrated database, two submissions with
+//      the same key and a NULL client were both accepted, so C1's guarantee silently did not hold for
+//      any client that omitted the field. A single NOT NULL unique key closes that hole.
+
+generator client {
+  // Prisma 7's generator. It is not `prisma-client-js` any more, and it requires an explicit
+  // `output`: the client is generated into the project instead of into node_modules. The path is
+  // gitignored, because generated code is not source.
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // No `url` here on purpose: Prisma 7 removed it from the schema and moved the connection string
+  // into `apps/api/prisma7.config.ts`. Keeping a URL in two places is how the wrong database gets
+  // migrated.
+}
+
+/// The six canonical job states (C2). Exactly six: a seventh is a design change, not a migration.
+enum JobState {
+  created
+  queued
+  running
+  succeeded
+  failed
+  canceled
+}
+
+/// The two failure classes of C4. Closed by the design, so it is a type and not a CHECK: a CHECK
+/// cannot stop a third value being added by an ALTER, and it cannot stop a CHECK that forbids NULL
+/// from being written by mistake.
+enum FailureClass {
+  retryable
+  non_retryable
+}
+
+/// The dispatch events the outbox may carry. One value today (`job.queued`, C3); the type is how a
+/// second one is added. The Prisma identifier cannot contain a dot, so the database label is mapped.
+enum OutboxEventType {
+  job_queued @map("job.queued")
+}
+
+/// One row per job. `attempts_used` is deliberately absent: it is derived from the `attempts` table
+/// (C2), never stored as a counter, and the absence is asserted by the schema suite.
+model Job {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  jobType     String   @map("job_type")
+  params      Json
+  state       JobState
+  availableAt DateTime @map("available_at") @db.Timestamptz(6)
+  errorCode   String?  @map("error_code")
+  artifactId  String?  @map("artifact_id") @db.Uuid
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(6)
+
+  inputs     JobInput[]
+  submission Submission?
+  attempts   Attempt[]
+  outbox     Outbox[]
+
+  /// The artifacts this job owns, through `artifacts.job_id`.
+  artifacts Artifact[] @relation("JobOwnedArtifacts")
+
+  /// The primary artifact, through the nullable `jobs.artifact_id`. Carries no uniqueness on
+  /// purpose: the ERD states the exclusivity is a convention, not a constraint.
+  primaryArtifact Artifact? @relation("JobPrimaryArtifact", fields: [artifactId], references: [id])
+
+  @@index([artifactId])
+  @@map("jobs")
+}
+
+/// One row per declared input. Plural from day one, because `pdf.merge` needs it and retrofitting a
+/// table is a migration.
+model JobInput {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  jobId        String   @map("job_id") @db.Uuid
+  ordinal      Int
+  declaredType String   @map("declared_type")
+  storageKey   String   @map("storage_key")
+  displayName  String?  @map("display_name")
+  byteSize     BigInt   @map("byte_size")
+  createdAt    DateTime @map("created_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  /// C2: inputs are plural with a unique ordinal. The composite unique also indexes `job_id` as its
+  /// leading column, which is why there is no separate index here (§3 query trace).
+  @@unique([jobId, ordinal])
+  @@map("job_inputs")
+}
+
+/// One row per claim — a real table, never a counter. `lease_owner` and `lease_expires_at` are the
+/// two halves of the fencing token the CAS depends on.
+model Attempt {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  jobId          String    @map("job_id") @db.Uuid
+  attemptNo      Int       @map("attempt_no")
+  leaseOwner     String    @map("lease_owner")
+  leaseExpiresAt DateTime  @map("lease_expires_at") @db.Timestamptz(6)
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(6)
+  /// NULL means the attempt is still held.
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+  /// NULL means the attempt has not failed; a value means it did, and which class.
+  errorClass     FailureClass? @map("error_class")
+  errorCode      String?   @map("error_code")
+  /// Default required by `design.md` §6 line 379: the canonical T4 insert omits `created_at`.
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@unique([jobId, attemptNo])
+  @@map("attempts")
+}
+
+/// One submission per job: the ownership row (the capability token) and the idempotency key.
+model Submission {
+  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  jobId            String   @unique @map("job_id") @db.Uuid
+  /// Client-supplied, NOT NULL and globally unique. See rule 4 in this file's header: the nullable
+  /// `(client_id, key)` pair this replaces could not deduplicate, because PostgreSQL treats NULLs as
+  /// distinct.
+  idempotencyKey   String   @unique @map("idempotency_key")
+  creatorTokenHash String   @map("creator_token_hash")
+  createdAt        DateTime @map("created_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@map("submissions")
+}
+
+/// A pointer plus metadata, never bytes (C6).
+model Artifact {
+  /// The one deliberate exception in §4: no database default. The worker mints this id with
+  /// `SELECT uuidv7()` before promoting, because the canonical storage key
+  /// `artifacts/{job_id}/{artifact_id}` must exist before the row does. PostgreSQL is still the
+  /// generator; no Python UUID library enters the system.
+  id          String   @id @db.Uuid
+  jobId       String   @map("job_id") @db.Uuid
+  storageKey  String   @map("storage_key")
+  byteSize    BigInt   @map("byte_size")
+  contentType String   @map("content_type")
+  checksum    String
+  filename    String
+  createdAt   DateTime @map("created_at") @db.Timestamptz(6)
+  /// `created_at + 7 days`, written at creation. Retention is enforced on the read path because no
+  /// sweep ships in this slice (C6, C8).
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+
+  job Job @relation("JobOwnedArtifacts", fields: [jobId], references: [id])
+
+  /// The reverse of `jobs.artifact_id`. A list, because the ERD does not constrain a job's primary
+  /// artifact to be exclusive.
+  primaryForJob Job[] @relation("JobPrimaryArtifact")
+
+  @@index([jobId])
+  @@map("artifacts")
+}
+
+/// The dispatch intent, written in the same transaction as the T1 transition (C3). An outbox row
+/// must never exist for a job that is not `queued`.
+model Outbox {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  jobId       String    @map("job_id") @db.Uuid
+  eventType   OutboxEventType @map("event_type")
+  payload     Json
+  /// NULL means unpublished: the relay poll selects on exactly this.
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  /// Relay publish attempts. Observability only; nothing schedules against it. The default is
+  /// required by `design.md` §6 line 355, whose canonical T1 insert omits this column.
+  attempts    Int       @default(0)
+  /// Default required by the same statement, which also omits `created_at`.
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@map("outbox")
+}

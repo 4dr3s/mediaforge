@@ -1,0 +1,6 @@
+{
+  "type": "mediaforge.job.dispatch.v1",
+  "job_id": "01952f1a-c0de-4000-8000-000000000000",
+  "occurred_at": "2026-09-17T12:00:00Z",
+  "environment": "staging"
+}

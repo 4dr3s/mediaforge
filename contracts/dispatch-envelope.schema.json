@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mediaforge.dev/contracts/dispatch-envelope.schema.json",
+  "title": "DispatchEnvelope",
+  "description": "The dispatch envelope is a notification, not the truth (design.md §7.1): it carries the job identity and the contract version, and nothing else. A fourth field would make it a second, stale copy of the job record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "job_id", "occurred_at"],
+  "properties": {
+    "type": {
+      "description": "The version discriminator; a different literal is a contract change and must be rejected, never ignored.",
+      "const": "mediaforge.job.dispatch.v1"
+    },
+    "job_id": {
+      "description": "The job identity; everything else is resolved from the job record.",
+      "type": "string"
+    },
+    "occurred_at": {
+      "description": "RFC 3339 instant; the time offset is mandatory.",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

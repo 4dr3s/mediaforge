@@ -6,7 +6,10 @@
 
 **Workflow:** Organic Driven Development (ODD).
 **Requirements source of truth:** `openspec/changes/audio-extract-vertical-slice/` (untouched).
-**Status:** `in progress`.
+**Status:** complete and pushed (9 commits, `746be7f`…`1c73e4c`, on `origin/main`) — 2026-09-17.
+Every task 1.1–1.8 carries recorded evidence. Not declared `closed`: this feature has no closure
+task, and what stays open is two deferred *decisions* (adopting knip; the absent ESLint
+configuration), not work.
 
 ---
 
@@ -28,6 +31,12 @@ because two of them had already drifted from the code they describe. A list of k
 itself a claim about the repository, and this one was stale. Findings that turned out to need no
 work are recorded as findings, not silently dropped: "we checked and it was already true" is
 evidence too.
+
+## Constraints (non-negotiable)
+
+- **Strict TDD.** Mode `strict`; source `openspec/config.yaml:58` (`strict_tdd: true`); runner the
+  two gates: `pnpm --filter api --fail-if-no-match run test` (api) and
+  `uv run --project workers/media pytest workers/media/tests -q` (worker).
 
 ## Decisions taken with the supervisor (2026-09-17)
 
@@ -122,6 +131,30 @@ with the decision to adopt knip, and it is listed in *Out of scope* with that re
 Also unavailable, and not to be confused with clean: `pnpm --filter api exec eslint .` fails with
 `Command "eslint" not found`. This project has no ESLint dependency and no ESLint configuration, so
 that check is **unavailable**, not passing.
+
+## Delivery
+
+Recorded 2026-09-17, measured retrospectively from the commits, not estimated at creation — this
+feature predates the field.
+
+- **Strategy:** `single-pr`, retrospective. The label is the nearest vocabulary, but the measured
+  truth is that no branch or pull request ever existed: the nine commits went directly onto `main`
+  and were pushed. Verified: on `origin/main` the tip is `1c73e4c`, the range `9eb288b..1c73e4c`
+  holds nine commits, all of them ancestors of `origin/main`, with no merge commit in the range and
+  no `repo-hygiene` branch anywhere (local or remote).
+- **Forecast:** +1163 authored changed lines (additions plus deletions), measured retrospectively
+  with `git log 9eb288b..1c73e4c --numstat`, excluding `pnpm-lock.yaml`, `generated` paths and
+  `.lock` files; split +20 code/config (`.gitattributes` 10, `Makefile` 7, `package.json` 3), +585
+  English docs (`repo-hygiene.md` 454, `s1-foundation.md` 107, SDD `tasks.md` 24), +558 Spanish
+  mirror (`repo-hygiene.es.md` 445, `s1-foundation.es.md` 113). The feature document §1.1 records
+  +951 (+20/+459/+472); that split reproduces only as additions *minus* deletions per file
+  (430+445+23+27+10+3+7+6), which contradicts its stated "additions plus deletions" formula —
+  the raw command and the decomposition are at `odd-doc-structure.md` §1.3.
+- **Slice boundaries:** none, because none were used. The work is `main`-linear, nine commits on
+  `origin/main`: `746be7f` (feature tracking) · `914b65d` (SDD plan reconciliation) · `758df00`
+  (Makefile entrypoints) · `b8f1c7d` (pnpm build scripts) · `42a189b` (lint re-measurement and D1
+  control) · `23585e5` (LF line endings) · `6fe5314` (S1 residue closure and mirror regeneration) ·
+  `0cb5497` (verifier gap closures) · `1c73e4c` (RDD conformance record).
 
 ## Tasks
 
@@ -257,6 +290,21 @@ are in the evidence log under *1.8 — RDD conformance record*.
 **Acceptance:** every work unit carries an explicit outcome, and the reason it cannot carry a tier
 is measured rather than assumed.
 
+## Progress
+
+State is `[x]` only where the evidence log holds observed proof for that task.
+
+| ID | Task | State | Evidence |
+| --- | --- | --- | --- |
+| 1.1 | Baseline: the stack is green before anything is touched | `[x]` | §1.1 |
+| 1.2 | `.gitattributes`: LF in the repository and in the working copy | `[x]` | §1.2 |
+| 1.3 | Reconcile the SDD plan with what exists | `[x]` | §1.3 |
+| 1.4 | Pin the allowed build scripts | `[x]` | §1.4 |
+| 1.5 | Document the two entrypoints | `[x]` | §1.5 |
+| 1.6 | Re-measure the findings that were never actioned | `[x]` | §1.6 |
+| 1.7 | Close the loop in the S1 document, and keep the Spanish copies honest | `[x]` | §1.7 |
+| 1.8 | RDD conformance record | `[x]` | §1.8 |
+
 ## Evidence log
 
 Raw output, appended as each task closes. Verbatim, not paraphrased.
@@ -340,6 +388,47 @@ $ command -v make
 $ make --version
 make: command not found [exit=127]
 ```
+
+### 1.6 — Re-measure the findings that were never actioned (2026-09-17)
+
+The proof lives in the two findings above, and this section only ties them to the task. The raw
+outputs are quoted here because a `[x]` requires an evidence section in this document, and this is
+the task 1.6 entry.
+
+F4 — the `large-class` advisory reproduces, and the verdict is do-not-act: the shipped rule has no
+method-count condition (its own fixture flags a one-method class), so the thing that is wrong is
+the rule's arity, not `health.controller.ts`. Deep disposition in F4. Raw output, pi-lens 4.2.0 on
+the current tree, measured 2026-09-17:
+
+```text
+🔎 pi-lens: apps\api\src\health.controller.ts — 0 blocking, 0 warning(s), 1 advisory(ies)
+  ⚠ L18 large-class: [slop] Large class detected — consider splitting responsibilities
+[exit=0]
+```
+
+F5 — the original knip finding no longer reproduces, and the full-workspace run surfaced a
+replacement finding that is deferred by decision: adopting knip stays out of scope, and the `uv`
+unlisted binary belongs to that adoption decision. Deep disposition in F5. Raw output, measured
+2026-09-17:
+
+```text
+$ pnpm dlx knip --workspace api
+(no output) [exit=0]
+```
+
+The full-workspace run (command not further quoted in F5):
+
+```text
+Unlisted binaries (1)
+uv  package.json
+```
+
+**On the state of this task, and the overrule.** This feature's own document (`odd-doc-structure.md`,
+task 1.3) originally required this task to stay `[ ]`, its stated reason *"no evidence section, trace
+only in finding F5"*. The supervisor overruled that on 2026-09-17 because the proof already exists
+in this same document: F4 holds the raw pi-lens output plus the decision not to act, F5 holds the
+raw knip output plus the deferred `uv` finding. The overrule is recorded here rather than hidden,
+and the task is `[x]` in `## Progress` on that basis.
 
 ### 1.7 — the closure (2026-09-17)
 
@@ -428,3 +517,9 @@ reported it.
   Adding configuration for a tool the repository does not depend on is not hygiene, it is scope.
 - ESLint. The repository has no ESLint dependency and no configuration; that is a stack decision,
   not a residue to clean up.
+
+## Next step
+
+All eight tasks are evidenced, so the next action is not work on this document: the open threads
+are the two deferred decisions from *Out of scope* — adopting knip (with the `uv` unlisted-binary
+finding) and the absent ESLint configuration — and they belong to the supervisor.
