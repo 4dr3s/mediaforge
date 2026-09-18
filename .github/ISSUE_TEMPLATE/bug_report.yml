@@ -1,0 +1,61 @@
+---
+# Bug report template. This repository's culture is measured claims: a report
+# without the raw command output and the environment that produced it cannot be
+# verified. The default label (type:bug) must exist on the remote for GitHub
+# to accept the form.
+name: Bug report
+description: Report a defect with measured evidence, not an impression.
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The observed behavior, stated precisely.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What I expected
+      description: The behavior that should have happened instead, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Exact reproduction steps
+      description: The commands, in order, that reproduce the defect on a clean checkout.
+      placeholder: |
+        1. docker compose -f docker/compose.yaml up -d --wait
+        2. pnpm --filter api --fail-if-no-match run test
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Raw command output (the evidence)
+      description: |-
+        Paste the exact output of the failing command, exit status included.
+        A report without the raw output cannot be verified; "it broke" is not evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |-
+        One version per line, each from the exact command named:
+        OS (`uname -a` or `ver`), Docker, Node, pnpm, Python/uv:
+        `docker --version`, `node --version`, `pnpm --version`, `uv --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Optional context or out-of-scope notes.
+    validations:
+      required: false

@@ -67,14 +67,20 @@ class DispatchEnvelope(pydantic.BaseModel):
 def parse_dispatch_envelope(raw: str | bytes) -> DispatchEnvelope:
     """Parse the raw queue message body (``str`` or ``bytes``) into a v1 dispatch envelope.
 
-    Raises ``ValueError`` on any deviation: invalid JSON, a non-object value, an unsupported
-    ``type`` version, a missing or wrong-typed field, a non-RFC-3339 ``occurred_at``, or an
-    extra field.
+    Raises ``ValueError`` on any deviation in the *document*: invalid JSON, a non-object value, an
+    unsupported ``type`` version, a missing or wrong-typed field, a non-RFC-3339 ``occurred_at``, or
+    an extra field. An argument that is neither ``str`` nor ``bytes`` violates the declared
+    precondition and raises ``TypeError`` -- a caller bug, not a rejected envelope.
     """
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
     if not isinstance(raw, str):
-        raise ValueError(f"envelope body must be str or bytes, got {type(raw).__name__}")
+        # A wrong argument TYPE is a caller error, not a rejected document: Python's own
+        # convention (and ruff TRY004) puts a precondition violation under TypeError, while
+        # every rejection of a *document* stays ValueError -- which is what the parity suite
+        # asserts. The TS side takes `unknown` and lets zod throw, so no parity fixture
+        # depends on this branch.
+        raise TypeError(f"envelope body must be str or bytes, got {type(raw).__name__}")
     try:
         value = json.loads(raw)
     except json.JSONDecodeError as exc:
