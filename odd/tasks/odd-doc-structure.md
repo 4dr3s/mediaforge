@@ -109,13 +109,18 @@ has no precedent anywhere, including upstream.
   read the same 390, and the committed range confirms it line for line. Slice 1.5 landed as
   `373598a`, so it is now commit-anchored like slices 1.1–1.4: `git diff --numstat 64177be..373598a`
   reproduces exactly the slice's recorded working-tree total, 769 (EN=376, ES=393) — raw output and
-  the arithmetic in §1.5. Slice 1.6, the slice this bullet is being updated by, has no commit yet,
-  so nothing about it is anchored to one: its own lines are counted against the working tree at
-  `373598a` with `git diff --numstat 373598a` — raw output and the total in §1.6; that count
-  includes the record's own lines (the §1.1 re-measure mechanism) and the wu2 mirror's token
-  line (Correction 1). Slices 1.1–1.3 keep their commit anchor (`96f03f6..ad8b122` = 1054, above),
-  slice 1.3a's own unit keeps its recorded count against `ad8b122` (545, in §1.3a), and slice 1.4
-  stays commit-anchored at `c96dd3d..64177be` = 390 (EN=191, ES=199, in §1.5).
+  the arithmetic in §1.5. Slice 1.6 landed as `ef3ec8f`, so it is now commit-anchored like slices
+  1.1–1.5: `git diff --numstat 373598a..ef3ec8f` reproduces exactly the slice's recorded
+  working-tree total, 609 (EN=286, ES=305, in §1.6) — raw output in §1.7. This closure slice (1.7)
+  has no commit yet, so nothing about it is anchored to one: its own lines are counted against the
+  working tree at `ef3ec8f` with `git diff --numstat ef3ec8f` — raw output and the total in §1.7;
+  that count includes the record's own lines (the §1.1 re-measure mechanism). The feature's
+  commit-anchored total across `96f03f6..ef3ec8f` stands at **3191** authored changed lines — raw
+  output in §1.7 — and that number is not final: this closure commit is itself outside the range,
+  so the final total becomes exact only once this work unit lands. Slices 1.1–1.3 keep their commit
+  anchor (`96f03f6..ad8b122` = 1054, above), slice 1.3a's own unit keeps its recorded count against
+  `ad8b122` (545, in §1.3a), and slice 1.4 stays commit-anchored at `c96dd3d..64177be` = 390
+  (EN=191, ES=199, in §1.5).
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -215,7 +220,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.4 | `s1-foundation.md` + mirror | `[x]` | §1.4 |
 | 1.5 | `wu2-data-model.md` + mirror | `[x]` | §1.5 |
 | 1.6 | Verification across all 8 documents | `[x]` | §1.6 |
-| 1.7 | Closure | `[ ]` | — **not closed**: cannot be checked off until this verification slice is itself committed and reviewed |
+| 1.7 | Closure | `[x]` | §1.7 |
 
 ## Evidence log
 
@@ -1248,6 +1253,180 @@ The wu2 pair's hash is unaffected by Correction 1 — the edit is outside its fe
 re-measured after the token change to confirm it still matches: `9f41d0d28cb00bb828a2ac48773c69b5`
 in both files.
 
+### 1.7 — Closure (2026-09-18)
+
+The closing slice. Everything below is raw command output, measured fresh at HEAD `ef3ec8f` for this
+entry; the three diff blocks at the end are capture-time values by design (the §1.1 re-measure
+mechanism — they include this record's own lines). One observation on dates: every earlier entry is
+dated (2026-09-17), while the three most recent commits (`64177be`, `373598a`, `ef3ec8f`) are dated
+2026-09-18; the existing entries' dates are accepted evidence and were not changed — recorded as an
+observation only.
+
+**The feature's authored cost, anchored to commits** — 7 commits, all Markdown-only:
+
+```text
+$ git diff --numstat 96f03f6..HEAD
+1346	0	odd/tasks/odd-doc-structure.es.md
+1290	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	2	odd/tasks/s1-foundation.es.md
+47	1	odd/tasks/s1-foundation.md
+73	4	odd/tasks/wu2-data-model.es.md
+70	1	odd/tasks/wu2-data-model.md
+54	3	odd/tasks/wu3-contract.es.md
+49	2	odd/tasks/wu3-contract.md
+
+add+del total: 3191 — of which the odd-doc-structure pair is 2636 (1346 + 1290), the English
+documents total 1557 and the Spanish mirrors 1634: the mirrors are again ~51% of the cost.
+
+$ git log --format='%h %ad %s' --date=short 96f03f6..HEAD
+5f1b556 2026-09-17 docs(odd): track the document-structure backfill as an ODD feature
+bed5b7c 2026-09-17 docs(odd): give wu3-contract its four structures, and record that it is not closed
+ad8b122 2026-09-17 docs(odd): give repo-hygiene its four structures and correct its Status
+c96dd3d 2026-09-17 docs(odd): unify the forecast formula and record the RDD opt-out
+64177be 2026-09-18 docs(odd): add the four structures to s1-foundation and close it
+373598a 2026-09-18 docs(odd): add structures to wu2-data-model and re-anchor slice 1.4
+ef3ec8f 2026-09-18 docs(odd): verify the eight documents and apply the two status corrections
+
+$ git diff --name-only 96f03f6..HEAD
+odd/tasks/odd-doc-structure.es.md
+odd/tasks/odd-doc-structure.md
+odd/tasks/repo-hygiene.es.md
+odd/tasks/repo-hygiene.md
+odd/tasks/s1-foundation.es.md
+odd/tasks/s1-foundation.md
+odd/tasks/wu2-data-model.es.md
+odd/tasks/wu2-data-model.md
+odd/tasks/wu3-contract.es.md
+odd/tasks/wu3-contract.md
+
+10 files, every one Markdown; non-Markdown files in the range: 0 (git rev-list --count
+96f03f6..HEAD = 7). The Markdown-only proof is what ## RDD conformance records as the
+justification for the opt-out.
+```
+
+**The residue claim's missing raw output** (closure item 3) — `6fe5314`:
+
+```text
+$ git show 6fe5314 --stat --format='%s'
+docs(odd): close the S1 residue list and regenerate the Spanish copies
+
+ odd/tasks/repo-hygiene.es.md  | 344 ++++++++++++++++++++++++++++++++++++++++++
+ odd/tasks/repo-hygiene.md     |  84 ++++++++++-
+ odd/tasks/s1-foundation.es.md | 113 +++++++++------
+ odd/tasks/s1-foundation.md    | 107 +++++++++------
+ 4 files changed, 562 insertions(+), 86 deletions(-)
+```
+
+**Per-slice counts** — the four commit-anchored ranges, raw; each total reproduces the slice's
+recorded value (slice 1.3a's own unit keeps its recorded working-tree count against `ad8b122`, 545,
+in §1.3a — historical, not commit-anchored):
+
+```text
+$ git diff --numstat 96f03f6..ad8b122        # slices 1.1-1.3
+384	0	odd/tasks/odd-doc-structure.es.md
+372	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	3	odd/tasks/wu3-contract.es.md
+44	2	odd/tasks/wu3-contract.md
+# = 1054 (EN 515 / ES 539)
+
+$ git diff --numstat c96dd3d..64177be        # slice 1.4
+145	3	odd/tasks/odd-doc-structure.es.md
+140	3	odd/tasks/odd-doc-structure.md
+49	2	odd/tasks/s1-foundation.es.md
+47	1	odd/tasks/s1-foundation.md
+# = 390 (EN 191 / ES 199)
+
+$ git diff --numstat 64177be..373598a        # slice 1.5
+308	10	odd/tasks/odd-doc-structure.es.md
+295	10	odd/tasks/odd-doc-structure.md
+72	3	odd/tasks/wu2-data-model.es.md
+70	1	odd/tasks/wu2-data-model.md
+# = 769 (EN 376 / ES 393)
+
+$ git diff --numstat 373598a..ef3ec8f        # slice 1.6
+303	9	odd/tasks/odd-doc-structure.es.md
+286	9	odd/tasks/odd-doc-structure.md
+1	1	odd/tasks/wu2-data-model.es.md
+# = 609 (the recorded split was EN 286 / ES 305; recomputed by the add+del-per-language
+#   convention that reconstructs the other three slices, the block reads EN 295 / ES 314)
+```
+
+**The Progress-table scan** — after row 1.7 flipped to `[x]`, all rows 1.1–1.7 resolve in both
+languages:
+
+```text
+$ for f in odd/tasks/odd-doc-structure.md odd/tasks/odd-doc-structure.es.md; do
+    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
+      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
+      [ -z "$id" ] && continue
+      if grep -q "^### $id" "$f"; then echo "$(basename "$f"): §$id OK"; else echo "$(basename "$f"): §$id MISSING"; fi
+    done
+  done
+odd-doc-structure.md: §1.1 OK
+odd-doc-structure.md: §1.2 OK
+odd-doc-structure.md: §1.3 OK
+odd-doc-structure.md: §1.3a OK
+odd-doc-structure.md: §1.4 OK
+odd-doc-structure.md: §1.5 OK
+odd-doc-structure.md: §1.6 OK
+odd-doc-structure.md: §1.7 OK
+odd-doc-structure.es.md: §1.1 OK
+odd-doc-structure.es.md: §1.2 OK
+odd-doc-structure.es.md: §1.3 OK
+odd-doc-structure.es.md: §1.3a OK
+odd-doc-structure.es.md: §1.4 OK
+odd-doc-structure.es.md: §1.5 OK
+odd-doc-structure.es.md: §1.6 OK
+odd-doc-structure.es.md: §1.7 OK
+
+# 16 rows, Section 1.1..1.7, both languages, 0 unresolved.
+```
+
+**This work unit's own diff against the working tree at `ef3ec8f`** (capture-time values; the
+counts include the record's own lines, the §1.1 re-measure mechanism):
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 283 ++++++++++++++++++++++++++++++++++++--
+ odd/tasks/odd-doc-structure.md    | 278 +++++++++++++++++++++++++++++++++++--
+ 2 files changed, 561 insertions(+), 19 deletions(-)
+
+$ git diff --numstat ef3ec8f
+283	10	odd/tasks/odd-doc-structure.es.md
+278	9	odd/tasks/odd-doc-structure.md
+
+add+del total for this slice: 580 (EN=287, ES=293)
+
+$ git diff --name-only
+odd/tasks/odd-doc-structure.es.md
+odd/tasks/odd-doc-structure.md
+```
+
+This pair cannot state its own hash inside its own fences without circularity — §1.3a–§1.6 record
+the same constraint. Measured at the end of this entry, after the last fenced edit:
+`awk '/^```/{f=!f;next} f' odd/tasks/odd-doc-structure.md | md5sum` → `41a5b76774076cea5c55d90c8d63f2e1`, and the
+same command on `odd-doc-structure.es.md` → `41a5b76774076cea5c55d90c8d63f2e1` — identical.
+
+**What surprised me.**
+
+1. **The forecast was falsified exactly where the cost is.** 2636 of the 3191 lines — ~83% — are
+   this feature's own document pair, and the mirror alone is 1346 lines, larger than the English
+   half and ~42% of the feature's total. The forecast field was specifically supposed to catch the
+   duplicated mirror cost (§1.1 measured it at roughly half of every feature); it estimated ~750
+   for everything and missed by 4.3×.
+2. **The feature caught in other documents exactly what its own forecast repeated.** §1.1 recorded
+   the trap ("a number nobody measured is worse than an empty field"); the ~750 forecast was
+   itself a number nobody had measured, and 3191 is what measuring produced. The forecast became
+   its own defect's example by the end.
+3. **The date mismatch only shows up in the log.** The three most recent commits (`64177be`,
+   `373598a`, `ef3ec8f`) are dated 2026-09-18 while every earlier evidence entry is (2026-09-17);
+   the divergence sat in the record and was only visible by looking at `git log` — the closure
+   states it as an observation and changes no accepted date.
+
 ## RDD conformance
 
 A section because the supervisor made an explicit decision about this feature's candidates on
@@ -1285,6 +1464,96 @@ A section because the supervisor made an explicit decision about this feature's 
 - Closing `wu3-contract` or `repo-hygiene`. Recording that they are open is the job; finishing them is
   not.
 
+## Closure (2026-09-18)
+
+**What shipped.** The eight feature documents — the four that predate this feature (`s1-foundation`,
+`repo-hygiene`, `wu2-data-model`, `wu3-contract`) plus this document's own pair — all carry the four
+structures now: a `## Progress` table per stable task ID, a `## Next step` line, the TDD
+mode/source/runner line inside `## Constraints`, and a `## Delivery` block with forecast, strategy and
+slice boundaries. Two `Status` lines were corrected: `s1-foundation` (`in progress` → `closed`) and
+`repo-hygiene` (corrected to complete-and-pushed), plus the wu2 mirror's status token (`cerrada` →
+`closed`), corrected in 1.6 by explicit supervisor decision. The six pre-existing documents' content
+is otherwise untouched — that was the constraint of this feature from its first slice, and §1.6's
+check 5 diff classification is the evidence.
+
+**The gates, as they stand.** Document gates — they are the five §1.6 checks, not test suites — each
+with its verdict and its negative control, because a check that cannot fail is not a check:
+
+1. the four structures present in all 8 documents — **PASS** (negative control: deleting `## Delivery`
+   from a copy yields `Delivery=0`);
+2. every `[x]` resolves to an evidence section — **PASS, 46/46 at the time §1.6 ran** (48/48 after this
+   closure's row flip; the negative control is a pointer to §1.9
+   yields `MISSING`);
+3. every `[ ]` has a stated reason — **PASS under the strict reading** (negative control: stripping the
+   reason fails under the strict reading and passes under the lenient one — the weakness is recorded in
+   §1.6);
+4. EN/ES fenced blocks byte-identical, 4 pairs — **PASS** (negative control: one changed character
+   inside a fence diverges the pair hashes);
+5. pre-existing English prose unchanged — **PASS with two category-(d) hunks**: the completed Strict
+   TDD bullets in `wu3-contract` and `wu2-data-model`, quoted in §1.6.
+
+**No runtime gate exists for this feature and none is claimed.** It changed Markdown only. The repo's
+two canonical test gates (`pnpm --filter api --fail-if-no-match run test` and `uv run --project
+workers/media pytest workers/media/tests -q`) were **not run for this feature and cannot be its gate**:
+nothing in it is executable. They are unaffected by a Markdown-only change; this closure does not claim
+them.
+
+**The forecast, settled.** `## Delivery`'s forecast was **~750 authored lines** at creation; the
+measured total is **3191**, about **4.3×** the forecast. The forecast was already known to be falsified
+at slice 1.3a (1054 across the first three slices) and was left visible and labelled there; the closure
+states the final ratio against the same base and does not rewrite the forecast bullet. The larger half
+of the cost is the Spanish mirror: the two `odd-doc-structure` files alone are 2636 of the 3191 lines,
+and they are one document plus its mirror — the finding the forecast field was supposed to catch, and
+did not.
+
+**What measurement changed on the way.** The forecast formula was corrected to additions plus deletions
+(1.3a); the running count was re-anchored to commits after the working-tree count proved
+self-invalidating — it included its own lines and moved with every edit (1.3a); the running count was
+measured three separate times as self-referential and corrected each time; the two correction fixes
+landed in 1.6 (the wu2 mirror's token, and row 1.7's per-row reason, which this closure checks off);
+and the four open items are settled in **Residue** below.
+
+**Residue.** The four open items, with their final disposition:
+
+1. The status token (`cerrada` in the wu2 mirror) — **corrected in 1.6**; the token now reads uniformly
+   wherever a backticked token exists (s1, wu2 and wu3 read `closed` / `closed` / `in progress`;
+   `repo-hygiene`'s status is prose and carries none).
+2. The feature document's own `[ ]` rows lacking a per-row reason — **corrected in 1.6**; row 1.7
+   gained its reason, and this closure checks it off.
+3. The `6fe5314` residue-closure claim in §1.4 has no raw git output — **closed as
+   corroborated-and-accepted**: the raw output is supplied in §1.7 (`git show 6fe5314`: 4 files,
+   +562/−86), the claim is corroborated by `repo-hygiene.md`'s slice-boundary list, and §1.4 itself
+   stays untouched as accepted evidence — this record is where the missing evidence now lives.
+4. The wu2 `## Closure` "Eighteen commits… none pushed" — **not corrected**: today the range
+   `1c73e4c..2a62fa7` holds 20 commits (18 only under the −2 reconciliation) and the branch has been
+   on `origin` since 2026-09-17 16:33. The sentence stays as accepted capture-time evidence, and this
+   feature's record — §1.6, restated here — is where the divergence is measured.
+
+**The RDD disposition.** The supervisor opted out of native review for this feature's candidates, on
+the review entry rule's documentation-only passive edit exception, with `repo-hygiene.md` §1.8 as
+in-repo precedent — recorded in `## RDD conformance` and restated here without reopening the decision.
+What this feature therefore does not have: no lineage, no consent envelope, no reviewer verdict, and no
+independent check on the writer other than §1.6's verification — which is mechanical, and was itself
+audited read-only.
+
+**What this feature did not do.** Restated, so a reader of the closure alone is not misled, from
+`## Out of scope`: no upstream issue was filed; no validator, template file or skill was created; no
+accepted evidence was rewritten; and `wu3-contract` and `repo-hygiene` were **not** closed — recording
+that they are open was the job. The change in an already-validated document beyond the four structures
+this feature delivered: the wu2
+mirror's status token, corrected in 1.6 by explicit supervisor decision — this closure does not claim
+"no validated document was touched".
+
+**Next.** These eight documents are the reference the next feature's documents copy — §1.1's shape is
+the spec the next agent starts from. The **route/trigger task-header convention** — every task header
+carrying `· route: … · trigger: …`, the declaration `orchestrator-delegation.md` asks for — applies to
+the *next* documents, not to these: this feature added the four structures to already-written
+documents and did not retrofit the eight headers, which stay as accepted evidence.
+
 ## Next step
 
-Run task 1.7 (closure).
+None inside this feature — 1.7 is the last task and this section closes it. The real measured
+position, stated plainly: `feat/odd-doc-structure` has no upstream configured and is **not pushed**
+(`origin/main` is `1c73e4c`); delivery — push, pull request, merge — is the supervisor's decision
+under ordinary repository policy, as every prior feature's closure recorded. The documents are the
+reference the next feature's documents copy.
