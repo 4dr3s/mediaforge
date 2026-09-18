@@ -7,7 +7,10 @@
 
 **Workflow:** Organic Driven Development (ODD).
 **Fuente de verdad de los requisitos:** `openspec/changes/audio-extract-vertical-slice/` (intacto).
-**Estado:** `en curso`.
+**Estado:** completo y pusheado (9 commits, `746be7f`…`1c73e4c`, en `origin/main`) — 2026-09-17.
+Cada tarea 1.1–1.8 lleva evidencia registrada. No declarado `closed`: esta feature no tiene tarea
+de cierre, y lo que queda abierto son dos *decisiones* diferidas (adoptar knip; la configuración
+ausente de ESLint), no trabajo.
 
 ---
 
@@ -29,6 +32,12 @@ dos ya se habían desviado del código que describen. Una lista de problemas con
 afirmación sobre el repositorio, y esta estaba vieja. Los hallazgos que resultaron no necesitar
 trabajo se registran como hallazgos, no se dropean en silencio: "revisamos y ya era verdad" también
 es evidencia.
+
+## Restricciones (no negociables)
+
+- **Strict TDD.** Modo `strict`; fuente `openspec/config.yaml:58` (`strict_tdd: true`); runner las
+  dos gates: `pnpm --filter api --fail-if-no-match run test` (api) y
+  `uv run --project workers/media pytest workers/media/tests -q` (worker).
 
 ## Decisiones tomadas con el supervisor (2026-09-17)
 
@@ -127,6 +136,32 @@ listado en *Fuera de alcance* con esa razón.
 También no disponible, y que no se confunda con limpio: `pnpm --filter api exec eslint .` falla
 con `Command "eslint" not found`. Este proyecto no tiene dependencia de ESLint ni configuración de
 ESLint, así que ese chequeo está **no disponible**, no pasando.
+
+## Delivery
+
+Registrado el 2026-09-17, medido retrospectivamente desde los commits, no estimado a la creación —
+esta feature es anterior al campo.
+
+- **Strategy:** `single-pr`, retrospectivo. La etiqueta es el vocabulario más cercano, pero la
+  verdad medida es que nunca existió una branch ni un pull request: los nueve commits fueron
+  directo a `main` y se pushearon. Verificado: en `origin/main` el tip es `1c73e4c`, el rango
+  `9eb288b..1c73e4c` tiene nueve commits, todos ancestros de `origin/main`, sin ningún merge commit
+  en el rango y sin ninguna branch `repo-hygiene` (local ni remota).
+- **Forecast:** +1163 líneas autoradas cambiadas (adiciones más deleciones), medidas
+  retrospectivamente con `git log 9eb288b..1c73e4c --numstat`, excluyendo `pnpm-lock.yaml`, rutas
+  `generated` y archivos `.lock`; desglose +20 código/config (`.gitattributes` 10, `Makefile` 7,
+  `package.json` 3), +585 documentos en inglés (`repo-hygiene.md` 454, `s1-foundation.md` 107,
+  `tasks.md` del SDD 24), +558 espejo en español (`repo-hygiene.es.md` 445, `s1-foundation.es.md`
+  113). El §1.1 del documento de la feature registra +951 (+20/+459/+472); ese desglose se
+  reproduce sólo como adiciones *menos* deleciones por archivo (430+445+23+27+10+3+7+6), lo que
+  contradice su fórmula declarada "adiciones más deleciones" — el comando crudo y la descomposición
+  están en el §1.3 de `odd-doc-structure.md`.
+- **Slice boundaries:** ninguna, porque no se usaron. El trabajo es lineal sobre `main`, nueve
+  commits en `origin/main`: `746be7f` (feature tracking) · `914b65d` (reconciliación del plan SDD) ·
+  `758df00` (entrypoints del Makefile) · `b8f1c7d` (build scripts de pnpm) · `42a189b` (re-medición
+  de lint y control D1) · `23585e5` (fin de línea LF) · `6fe5314` (cierre del residuo de S1 y
+  regeneración de espejos) · `0cb5497` (huecos del verificador) · `1c73e4c` (registro de
+  conformidad RDD).
 
 ## Tareas
 
@@ -266,6 +301,21 @@ las razones están en el log de evidencia, bajo *1.8 — Registro de conformidad
 **Aceptación:** cada work unit lleva un outcome explícito, y la razón por la que no puede llevar un
 tier está medida, no asumida.
 
+## Progress
+
+El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada de esa tarea.
+
+| ID | Tarea | Estado | Evidencia |
+| --- | --- | --- | --- |
+| 1.1 | Baseline: el stack está verde antes de tocar nada | `[x]` | §1.1 |
+| 1.2 | `.gitattributes`: LF en el repositorio y en la copia de trabajo | `[x]` | §1.2 |
+| 1.3 | Reconciliar el plan SDD con lo que existe | `[x]` | §1.3 |
+| 1.4 | Fijar los build scripts permitidos | `[x]` | §1.4 |
+| 1.5 | Documentar los dos entrypoints | `[x]` | §1.5 |
+| 1.6 | Re-medir los hallazgos que nunca se accionaron | `[x]` | §1.6 |
+| 1.7 | Cerrar el círculo en el documento de S1 y mantener honestas las copias en español | `[x]` | §1.7 |
+| 1.8 | Registro de conformidad RDD | `[x]` | §1.8 |
+
 ## Log de evidencia
 
 Salida cruda, agregada a medida que cierra cada tarea. Verbatim, sin parafrasear.
@@ -350,6 +400,48 @@ $ command -v make
 $ make --version
 make: command not found [exit=127]
 ```
+
+### 1.6 — Re-medir los hallazgos que nunca se accionaron (2026-09-17)
+
+La prueba vive en los dos hallazgos de más arriba, y esta sección sólo los ata a la tarea. Las
+salidas crudas se citan acá porque un `[x]` exige una sección de evidencia en este documento, y ésta
+es la entrada de la tarea 1.6.
+
+F4 — el advisory `large-class` se reproduce, y el veredicto es no accionar: la regla publicada no
+tiene condición de cantidad de métodos (su propio fixture marca una clase de un método), así que lo
+que está mal es la aridad de la regla, no `health.controller.ts`. Disposición completa en F4. Salida
+cruda, pi-lens 4.2.0 sobre el árbol actual, medida el 2026-09-17:
+
+```text
+🔎 pi-lens: apps\api\src\health.controller.ts — 0 blocking, 0 warning(s), 1 advisory(ies)
+  ⚠ L18 large-class: [slop] Large class detected — consider splitting responsibilities
+[exit=0]
+```
+
+F5 — el hallazgo original de knip ya no se reproduce, y la corrida full-workspace sacó a la luz un
+hallazgo de reemplazo que queda diferido por decisión: adoptar knip sigue fuera de alcance, y el
+binario no listado `uv` pertenece a esa decisión de adopción. Disposición completa en F5. Salida
+cruda, medida el 2026-09-17:
+
+```text
+$ pnpm dlx knip --workspace api
+(no output) [exit=0]
+```
+
+La corrida full-workspace (comando no citado más allá en F5):
+
+```text
+Unlisted binaries (1)
+uv  package.json
+```
+
+**Sobre el estado de esta tarea, y la anulación.** El documento de esta feature
+(`odd-doc-structure.md`, tarea 1.3) originalmente exigía que esta tarea quedara en `[ ]`, con su
+razón declarada *"no hay sección de evidencia, el rastro está sólo en el hallazgo F5"*. El
+supervisor anuló eso el 2026-09-17 porque la prueba ya existe en este mismo documento: F4 tiene la
+salida cruda de pi-lens más la decisión de no accionar, y F5 tiene la salida cruda de knip más el
+hallazgo diferido de `uv`. La anulación queda registrada acá, no escondida, y la tarea está `[x]` en
+`## Progress` sobre esa base.
 
 ### 1.7 — el cierre (2026-09-17)
 
@@ -443,3 +535,10 @@ par, re-corrido de forma independiente por el padre después de que el worker lo
   higiene, es scope.
 - ESLint. El repositorio no tiene dependencia de ESLint ni configuración; eso es una decisión de
   stack, no un residuo para limpiar.
+
+## Next step
+
+Las ocho tareas están con evidencia, así que la próxima acción no es trabajo sobre este documento:
+los hilos abiertos son las dos decisiones diferidas de *Fuera de alcance* — adoptar knip (con el
+hallazgo de binario no listado `uv`) y la configuración ausente de ESLint — y pertenecen al
+supervisor.

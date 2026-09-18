@@ -94,7 +94,15 @@ entrega no tiene precedente en ningún lado, upstream incluido.
   lockfiles excluidos) sobre 8 documentos, 4 en inglés más 4 espejos en español que actúan como una
   unidad cada uno. Base medida: las adiciones por documento son 4 estructuras × ~15–20 líneas,
   duplicadas por el espejo.
-- **Conteo corriente:** +454 líneas autoradas cambiadas después del work-unit 1.1 — 223 en el documento en inglés y 231 en su espejo español, así que el espejo vuelve a ser el 51% del costo. Tanto el forecast como este conteo superan el presupuesto de ~400, así que la estrategia de cadena se aplica antes del próximo commit, no después.
+- **Conteo corriente:** 1054 líneas autoradas cambiadas a través de los slices 1.1, 1.2 y 1.3
+  juntos, medidas desde la base de la feature branch `96f03f6` con `git diff --numstat 96f03f6`
+  (incluyendo las ediciones sin commitear del slice 1.3, y las líneas de este mismo bullet): 515
+  en los documentos en inglés y 539 en sus espejos en español, así que los espejos vuelven a ser
+  ~51% del costo. Son altas más bajas, la única fórmula que el supervisor unificó el 2026-09-17;
+  los cuatro totales de §1.1 son *netos*, que es el defecto registrado abajo y corregido en 1.3a.
+  La base es la lección dura de §1.1, el punto de bifurcación y no el tip de la feature anterior:
+  un rango que arranca en `2a62fa7` se tragaría los cuatro commits de `wu3-contract`, ancestros
+  de esta branch.
 - **Fronteras de slice:** cinco slices, uno por par de documentos (un documento en inglés más su
   espejo español), apilados sobre `feat/odd-doc-structure` e integrados al final. El slice 1 es el par
   de este mismo documento, del work-unit 1.1 (`92c5fb4`); los slices 2–5 son las tareas 1.2–1.5. El
@@ -171,8 +179,8 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | ID | Tarea | Estado | Evidencia |
 | --- | --- | --- | --- |
 | 1.1 | La forma uniforme y los hechos medidos | `[x]` | §1.1 |
-| 1.2 | `wu3-contract.md` + espejo | `[ ]` | — |
-| 1.3 | `repo-hygiene.md` + espejo | `[ ]` | — |
+| 1.2 | `wu3-contract.md` + espejo | `[x]` | §1.2 |
+| 1.3 | `repo-hygiene.md` + espejo | `[x]` | §1.3 |
 | 1.4 | `s1-foundation.md` + espejo | `[ ]` | — |
 | 1.5 | `wu2-data-model.md` + espejo | `[ ]` | — |
 | 1.6 | Verificación sobre los 8 documentos | `[ ]` | — |
@@ -250,6 +258,116 @@ nombra el plan de fixes sin aplicar del verificador — medido, no inferido, com
 bloque de Delivery registra la frontera de slice como *"ninguna, porque no se usó ninguna"*:
 `feat/wu3-contract` no tiene upstream ni pull request, y está 24 commits por delante de `origin/main`
 (un conteo que incluye `wu2-data-model`, porque la historia está apilada).
+
+### 1.3 — `repo-hygiene.md` y su espejo español (2026-09-17)
+
+Las cuatro estructuras agregadas a los dos archivos; la línea de `Status` corregida (complete and
+pushed, nueve commits en `origin/main`); y la anulación del supervisor del 2026-09-17 aplicada — la
+tarea 1.6 de `repo-hygiene` ahora tiene una sección de evidencia y está `[x]`, con la anulación
+registrada en ese documento y no escondida. Los checks de abajo son los que la tarea 1.6 va a
+re-correr sobre los ocho documentos, corridos acá sobre este par, crudos:
+
+```text
+$ for f in repo-hygiene.md repo-hygiene.es.md; do
+    printf '%s: constraints=%s delivery=%s progress=%s next=%s\n' "$f" \
+      "$(grep -c '^## Constraints (non-negotiable)\|^## Restricciones (no negociables)' odd/tasks/$f)" \
+      "$(grep -c '^## Delivery$' odd/tasks/$f)" "$(grep -c '^## Progress$' odd/tasks/$f)" \
+      "$(grep -c '^## Next step$' odd/tasks/$f)"; done
+repo-hygiene.md: constraints=1 delivery=1 progress=1 next=1
+repo-hygiene.es.md: constraints=1 delivery=1 progress=1 next=1
+
+$ awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' odd/tasks/repo-hygiene.md | sort | uniq -c
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+$ awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' odd/tasks/repo-hygiene.es.md | sort | uniq -c
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+
+$ awk '/^```/{f=!f;next} f' odd/tasks/repo-hygiene.md | md5sum
+246e1a4a0e106c5ea69b9577af0849d8  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/repo-hygiene.es.md | md5sum
+246e1a4a0e106c5ea69b9577af0849d8  -      # identical
+```
+
+Cada `[x]` de cualquiera de las dos tablas `## Progress` apunta a §1.1..§1.8 y cada una de esas
+secciones existe en el mismo documento — el escaneo de punteros de arriba cuenta exactamente un
+encabezado de evidencia por id, en los dos idiomas. El orden de encabezados `##` es idéntico en
+los dos archivos: 11 secciones cada uno, misma secuencia; la copia en español traduce los
+encabezados de prosa (`Restricciones (no negociables)`, `Decisiones …`, `Hallazgos …`, `Tareas`,
+`Log de evidencia`, `Fuera de alcance`) y conserva los encabezados de campo (`Delivery`,
+`Progress`, `Next step`) verbatim.
+
+**Prueba de prosa.** `git diff --stat` (este work unit, sin commitear) y una lectura del diff:
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 122 +++++++++++++++++++++++++++++++++++++-
+ odd/tasks/odd-doc-structure.md    | 117 +++++++++++++++++++++++++++++++++++-
+ odd/tasks/repo-hygiene.es.md      | 103 +++++++++++++++++++++++++++++++-
+ odd/tasks/repo-hygiene.md         |  97 +++++++++++++++++++++++++++++-
+ 4 files changed, 431 insertions(+), 8 deletions(-)
+
+$ git diff --numstat 96f03f6
+382	0	odd/tasks/odd-doc-structure.es.md
+370	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	3	odd/tasks/wu3-contract.es.md
+44	2	odd/tasks/wu3-contract.md
+```
+
+El diff de trabajo toca sólo los cuatro archivos de documentos, y cada cambio es una de estas
+cosas: las cuatro estructuras agregadas, la línea de `Status` corregida, o el bookkeeping de este
+documento. Nada más se reescribió.
+
+**Sobre el conteo corriente.** El bullet `**Conteo corriente:**` de `## Delivery` se actualiza
+para los slices 1.1, 1.2 y 1.3 juntos: `git diff --numstat 96f03f6` (arriba, medido desde la base
+de la feature branch, con las ediciones sin commitear del slice 1.3 incluidas) lee 1054 líneas
+autoradas en total — 515 en los documentos en inglés y 539 en sus espejos en español, así que
+los espejos vuelven a ser ~51% del costo. Son altas más bajas, que ahora es la única fórmula
+vigente en este documento; los cuatro totales de §1.1 son netos, y unificarlos es la tarea 1.3a.
+Re-medir después de escribir es el mecanismo de §1.1, así que el total incluye las líneas de
+esta misma sección.
+
+**Lo que me sorprendió.**
+
+1. **La fila de `repo-hygiene` de §1.1 (+951 = +20/+459/+472) no se reproduce con su fórmula
+   declarada.** Sumando adiciones *más* deleciones sobre `git log 9eb288b..1c73e4c --numstat` da
+   +1163, no +951. El desglose +951 se reproduce exacto sólo como adiciones *menos* deleciones por
+   archivo: 430 + 445 + 23 + 27 + 10 + 3 + 7 + 6 = 951 (repo-hygiene.md, repo-hygiene.es.md,
+   s1-foundation.md, s1-foundation.es.md, .gitattributes, package.json, Makefile y el `tasks.md`
+   del SDD agrupado en los docs en inglés). La aritmética de §1.1 contradice su propia oración de
+   fórmula; el forecast corregido (adiciones más deleciones) está registrado en `## Delivery` de
+   `repo-hygiene.md`, y la fila de §1.1 queda intacta como evidencia aceptada.
+2. **El espejo español de este documento ya se había desviado antes de este slice.** La fila 1.2
+   de `## Progress` en `odd-doc-structure.es.md` leía `[ ]` mientras la tabla canónica en inglés
+   leía `[x]` (la evidencia §1.2 existe en los dos archivos). Detectado al regenerar el espejo acá;
+   corregido para que coincida con el canónico.
+3. **Un matiz de notación de rango en la línea de status.** `746be7f..1c73e4c`, leído como rango
+   de git, excluye a `746be7f` y cuenta 8 commits; el rango de 9 commits es `9eb288b..1c73e4c` (el
+   padre de `746be7f` es `9eb288b`). El texto dictado por el supervisor decía "9 commits" junto a un
+   rango que contiene ocho: la trampa de notación en miniatura. Corregido el 2026-09-17: la línea de
+   status ahora escribe el span como `746be7f`…`1c73e4c` (un span, no un rango de git) y el conteo
+   de nueve es el medido desde `9eb288b..1c73e4c`.
+
+**Sobre la anulación.** La tarea 1.3 de este documento originalmente exigía que la tarea 1.6 de
+`repo-hygiene` quedara en `[ ]` (*"no hay sección de evidencia, el rastro está sólo en el hallazgo
+F5"*). El supervisor anuló eso el 2026-09-17 porque la prueba ya existe en el mismo documento — F4
+tiene la salida cruda de pi-lens y la decisión de no accionar, F5 la salida cruda de knip y el
+hallazgo diferido de `uv`. El cuerpo de la tarea de arriba conserva su texto original; la anulación
+queda registrada acá y, como sección de evidencia, en el propio documento anulado.
 
 ## Fuera de alcance
 

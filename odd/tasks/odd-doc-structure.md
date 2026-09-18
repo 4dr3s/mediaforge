@@ -88,7 +88,14 @@ has no precedent anywhere, including upstream.
 - **Forecast:** ~750 authored changed lines (additions plus deletions, generated files and lockfiles
   excluded) across 8 documents, 4 English plus 4 Spanish mirrors acting as a single unit each.
   Measured basis: the additions per document are 4 structures × ~15–20 lines, doubled by the mirror.
-- **Running count:** +454 authored changed lines after work-unit 1.1 — 223 in the English document and 231 in its Spanish mirror, so the mirror is again 51% of the cost. Both the forecast and this count exceed the ~400 budget, so the chain strategy is applied before the next commit, not after.
+- **Running count:** 1054 authored changed lines across slices 1.1, 1.2 and 1.3 together,
+  measured from the feature branch base `96f03f6` with `git diff --numstat 96f03f6` (the
+  uncommitted slice 1.3 edits included, this bullet's own lines among them): 515 in the English
+  documents and 539 in their Spanish mirrors, so the mirrors are again ~51% of the cost. This is
+  additions plus deletions, the one formula the supervisor settled on 2026-09-17; §1.1's four
+  per-feature totals are *net* instead, which is the defect recorded below and corrected in 1.3a.
+  The base is §1.1's hard-won lesson, the branch point and not the previous feature's tip: a range
+  starting at `2a62fa7` would swallow the four `wu3-contract` commits, ancestors of this branch.
 - **Slice boundaries:** five slices, one per document pair (an English document plus its Spanish
   mirror), stacked on `feat/odd-doc-structure` and integrated at the end. Slice 1 is this document's
   own pair, from work-unit 1.1 (`92c5fb4`); slices 2–5 are tasks 1.2–1.5. The commit range of each
@@ -163,7 +170,7 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | --- | --- | --- | --- |
 | 1.1 | The uniform shape and the measured facts | `[x]` | §1.1 |
 | 1.2 | `wu3-contract.md` + mirror | `[x]` | §1.2 |
-| 1.3 | `repo-hygiene.md` + mirror | `[ ]` | — |
+| 1.3 | `repo-hygiene.md` + mirror | `[x]` | §1.3 |
 | 1.4 | `s1-foundation.md` + mirror | `[ ]` | — |
 | 1.5 | `wu2-data-model.md` + mirror | `[ ]` | — |
 | 1.6 | Verification across all 8 documents | `[ ]` | — |
@@ -240,6 +247,114 @@ the verifier's unapplied fix plan — measured, not inferred, as §1.1 records. 
 the slice boundary as *"none, because none were used"*: `feat/wu3-contract` has no upstream and no pull
 request, and sits 24 commits past `origin/main` (a count that includes `wu2-data-model`, because the
 history is stacked).
+
+### 1.3 — `repo-hygiene.md` and its Spanish mirror (2026-09-17)
+
+The four structures added to both files; the `Status` line corrected (complete and pushed, nine
+commits on `origin/main`); and the supervisor's 2026-09-17 overrule applied — repo-hygiene task
+1.6 now carries an evidence section and is `[x]`, with the overrule recorded in that document
+rather than hidden. The checks below are the checks task 1.6 will re-run across all eight
+documents, run here on this pair, raw:
+
+```text
+$ for f in repo-hygiene.md repo-hygiene.es.md; do
+    printf '%s: constraints=%s delivery=%s progress=%s next=%s\n' "$f" \
+      "$(grep -c '^## Constraints (non-negotiable)\|^## Restricciones (no negociables)' odd/tasks/$f)" \
+      "$(grep -c '^## Delivery$' odd/tasks/$f)" "$(grep -c '^## Progress$' odd/tasks/$f)" \
+      "$(grep -c '^## Next step$' odd/tasks/$f)"; done
+repo-hygiene.md: constraints=1 delivery=1 progress=1 next=1
+repo-hygiene.es.md: constraints=1 delivery=1 progress=1 next=1
+
+$ awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' odd/tasks/repo-hygiene.md | sort | uniq -c
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+$ awk '/^## Evidence log|^## Log de evidencia/{ev=1} /^### / && ev{print $2}' odd/tasks/repo-hygiene.es.md | sort | uniq -c
+      1 1.1
+      1 1.2
+      1 1.3
+      1 1.4
+      1 1.5
+      1 1.6
+      1 1.7
+      1 1.8
+
+$ awk '/^```/{f=!f;next} f' odd/tasks/repo-hygiene.md | md5sum
+246e1a4a0e106c5ea69b9577af0849d8  -
+$ awk '/^```/{f=!f;next} f' odd/tasks/repo-hygiene.es.md | md5sum
+246e1a4a0e106c5ea69b9577af0849d8  -      # identical
+```
+
+Every `[x]` in either `## Progress` table points at §1.1..§1.8 and every one of those sections
+exists in the same document — the pointer scan above counts exactly one evidence heading per id,
+in both languages. `##` heading order is identical in both files: 11 sections each, same
+sequence; the Spanish copy translates the prose headings (`Restricciones (no negociables)`,
+`Decisiones …`, `Hallazgos …`, `Tareas`, `Log de evidencia`, `Fuera de alcance`) and keeps the
+field headings (`Delivery`, `Progress`, `Next step`) verbatim.
+
+**Prose proof.** `git diff --stat` (this work unit, uncommitted) and a read of the diff:
+
+```text
+$ git diff --stat
+ odd/tasks/odd-doc-structure.es.md | 122 +++++++++++++++++++++++++++++++++++++-
+ odd/tasks/odd-doc-structure.md    | 117 +++++++++++++++++++++++++++++++++++-
+ odd/tasks/repo-hygiene.es.md      | 103 +++++++++++++++++++++++++++++++-
+ odd/tasks/repo-hygiene.md         |  97 +++++++++++++++++++++++++++++-
+ 4 files changed, 431 insertions(+), 8 deletions(-)
+
+$ git diff --numstat 96f03f6
+382	0	odd/tasks/odd-doc-structure.es.md
+370	0	odd/tasks/odd-doc-structure.md
+101	2	odd/tasks/repo-hygiene.es.md
+96	1	odd/tasks/repo-hygiene.md
+49	3	odd/tasks/wu3-contract.es.md
+44	2	odd/tasks/wu3-contract.md
+```
+
+The working diff touches only the four document files, and each change is one of: the four
+structures added, the `Status` line corrected, or the bookkeeping in this document. Nothing else
+was rewritten.
+
+**On the running count.** The `**Running count:**` bullet in `## Delivery` is brought up to date
+for slices 1.1, 1.2 and 1.3 together: `git diff --numstat 96f03f6` (above, measured from the
+feature branch base, uncommitted slice 1.3 edits included) reads 1054 authored changed lines —
+515 in the English documents and 539 in their Spanish mirrors, so the mirrors are again ~51% of
+the cost. It is additions plus deletions, which is now the single formula in this document; §1.1's
+four totals are net, and unifying them is task 1.3a. Re-measuring after writing is the §1.1
+mechanism, so the total includes this section's own lines.
+
+**What surprised me.**
+
+1. **§1.1's `repo-hygiene` row (+951 = +20/+459/+472) does not reproduce under its stated
+   formula.** Summing additions *plus* deletions over `git log 9eb288b..1c73e4c --numstat` gives
+   +1163, not +951. The +951 split reproduces exactly only as additions *minus* deletions per
+   file: 430 + 445 + 23 + 27 + 10 + 3 + 7 + 6 = 951 (repo-hygiene.md, repo-hygiene.es.md,
+   s1-foundation.md, s1-foundation.es.md, .gitattributes, package.json, Makefile, and the SDD
+   `tasks.md` bucketed into the English docs). §1.1's arithmetic contradicts its own formula
+   sentence; the corrected forecast (additions plus deletions) is recorded in `repo-hygiene.md`
+   `## Delivery`, and §1.1's row is left untouched as accepted evidence.
+2. **The Spanish mirror of this document had drifted before this slice.** `odd-doc-structure.es.md`
+   `## Progress` row 1.2 read `[ ]` while the canonical English table read `[x]` (§1.2 evidence
+   exists in both files). Caught while regenerating the mirror here; corrected to match the
+   canonical.
+3. **A range-notation nuance in the status line.** `746be7f..1c73e4c`, read as a git range,
+   excludes `746be7f` and counts 8 commits; the 9-commit range is `9eb288b..1c73e4c`
+   (`746be7f`'s parent is `9eb288b`). The supervisor's dictated wording said "9 commits" next to a
+   range that holds eight, which is the notation trap in miniature. Corrected on 2026-09-17: the
+   status line now writes the span as `746be7f`…`1c73e4c` (a span, not a git range) and the count
+   of nine is the one measured from `9eb288b..1c73e4c`.
+
+**On the overrule.** Task 1.3 of this document originally required repo-hygiene task 1.6 to stay
+`[ ]` (*"no evidence section, trace only in finding F5"*). The supervisor overruled that on
+2026-09-17 because the proof already exists in the same document — F4 holds the raw pi-lens
+output and the decision not to act, F5 the raw knip output and the deferred `uv` finding. The
+task body above keeps its original text; the overrule is recorded here and, as an evidence
+section, in the overruled document itself.
 
 ## Out of scope
 
