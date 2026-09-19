@@ -138,6 +138,40 @@ As in WU-2: assess each work unit, record the tier and outcome, and satisfy the 
 independent verifier. The expected tier is `unassessable`-as-high for candidates with no risk signal
 (the defect recorded in `repo-hygiene.md`); a different tier is new information for the log.
 
+### 1.3a — Apply the verifier's fix plan: make the gate apply the contract it claims to apply · owner: AI
+
+Added 2026-09-19, from §1.3. This task exists because the independent verifier's refutations were
+accepted as correct and were left standing: task 1.3 is `[x]` for having *run*, and what it refuted is
+exactly the work this task is. The task ID carries the `a` suffix rather than a new number because
+`odd-doc-structure.es.md:26` already cites "the task 1.4 (Closure)" of this document, and renumbering
+would silently invalidate a reference held by another document.
+
+- **F1 — assert the schema's semantics, in both suites.** `contracts/dispatch-envelope.schema.json` is
+  the artifact C3 calls the contract, and it is the one artifact no gate applied: mutating it (a fourth
+  property allowed, the version `const` changed to `...v2`, `format: date-time` changed to `date`) passed
+  both suites untouched. Both parity suites must read the schema file and assert
+  `additionalProperties: false`, the version `const` equal to `mediaforge.job.dispatch.v1`,
+  `format: date-time` on `occurred_at`, `type: object`, and exactly the three properties
+  `type`, `job_id`, `occurred_at` — required as the same three.
+- **F2 — measure parity over the domain, not over the sample.** The Python side validates RFC 3339 with a
+  bare regex, so it accepts four documents zod rejects, and the shipped fixtures never exercise the
+  difference. Replace the regex-only check with grammar **plus** calendar-aware validation (the regex
+  stays as the grammar gate; `datetime.fromisoformat` supplies the calendar and offset-range gate), and
+  add the four missing fixtures to `contracts/fixtures/envelopes/invalid/`: an impossible date, an
+  invalid month, a non-leap February 29th, and an offset outside RFC 3339 (`+24:00`).
+- **F3 — the scan must name the adapter and cover the validators.** Narrow the forbidden vocabulary to
+  Redis-specific tokens (`xadd`, `xreadgroup`, `xack`, `xautoclaim`, `xgroup`, `delivery_count`,
+  `redis`) — banning `consumer` was banning the domain's own word for the Python side, which C3's text
+  itself uses — and extend the scan to both validator modules:
+  `apps/api/src/contracts/envelope.ts`, `apps/api/src/contracts/job-params.ts` and
+  `workers/media/src/mediaforge/contracts.py`.
+
+**Acceptance:** both parity suites pass, and each fix is *demonstrated catching the case it was written
+for*, by mutation rather than by report: F1 fails when the schema is mutated one property at a time and
+passes again when it is reverted; F2 fails on the four new fixtures before the calendar check exists and
+passes after; F3 fails when a Redis token is planted in either validator module. The four mutations are
+reverted, and the raw output of every run is in §1.3a.
+
 ### 1.4 — Closure · owner: AI
 
 `contracts/README.md` and the feature doc agree with what exists; the `.es.md` copy is generated and
@@ -153,10 +187,11 @@ outcome per work unit live in the evidence log, where they were recorded as the 
 | 1.1 | RED: the two parity suites | `[x]` | §1.1 |
 | 1.2 | GREEN: the contract, the registry, the fixtures and the two validators | `[x]` | §1.2 |
 | 1.3 | RDD conformance, per work unit | `[x]` | §1.3 |
-| 1.4 | Closure | `[ ]` | — **not closed**: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
+| 1.3a | Apply the verifier's fix plan (F1, F2, F3) | `[ ]` | — |
+| 1.4 | Closure | `[ ]` | — blocked on 1.3a: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
 
 Task 1.3 is `[x]` because the verification it asks for *ran* and its refutations are recorded; it is
-not a statement that the feature is sound. What it refuted is the reason 1.4 stays open.
+not a statement that the feature is sound. What it refuted is exactly what task 1.3a then applied.
 
 ## Evidence log
 
@@ -310,11 +345,9 @@ merely by a post-parse key check; the numeric limits duplicated nowhere but the 
 
 ## Next step
 
-Apply the verifier's fix plan recorded in §1.3 before closing — **F1** (assert the schema's semantics
-in both suites: `additionalProperties: false`, the version `const`, `format: date-time`, exactly three
-properties), **F2** (calendar-aware date validation on the Python side in place of the regex, plus
-the four missing fixtures: impossible date, invalid month, a non-leap February 29th and a `+24:00`
-offset) and **F3** (narrow the vocabulary scan to Redis-specific tokens and include both validator
-modules). Task 1.4 stays `[ ]` until they land. Measured 2026-09-17: F2 is not applied — the four
-fixtures are absent from `contracts/fixtures/envelopes/invalid/` and
-`workers/media/src/mediaforge/contracts.py` contains no `datetime`, `date(` or `fromisoformat`.
+Task 1.4 — the closure — is the only open task that remains once 1.3a lands, and task 1.3a is the work
+in flight: it applies the verifier's fix plan (F1, F2, F3) from §1.3. Closure means
+`contracts/README.md` and this document agree with what exists, the `.es.md` mirror is
+regenerated and verified byte-identical on its code blocks, and the gates are recorded. Delivery —
+push, pull request, merge — remains the supervisor's decision under ordinary repository policy, as
+every prior feature's closure recorded.
