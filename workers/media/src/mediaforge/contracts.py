@@ -39,15 +39,21 @@ ENVELOPE_TYPE_V1 = "mediaforge.job.dispatch.v1"
 # 1. the grammar gate below — the time offset is mandatory, so a bare date or an offset-less
 #    timestamp is not an RFC 3339 instant, the offset must carry the ``:`` separator
 #    (``fromisoformat`` alone would also accept out-of-band forms such as ``+0000``), and
-#    seconds are always present;
+#    seconds are always present. The offset's hour and minute components are range-pinned here
+#    on purpose: ``fromisoformat`` does **not** range-check them, it *normalises* them, so
+#    ``+02:60`` becomes ``+03:00`` and ``+02:99`` becomes ``+03:39`` instead of being rejected.
+#    The zod validator rejects both, so the grammar gate has to as well or the two runtimes
+#    disagree over the offset domain — the defect this whole task exists to remove, and one
+#    that shipped here before (`offset-minutes-out-of-range-occurred-at.json` measures it);
 # 2. a calendar and offset-range gate via ``datetime.fromisoformat`` — the regex accepts
-#    February 30th, month 13, a non-leap February 29th and a ``+24:00`` offset (all of which
-#    RFC 3339 forbids and the zod validator rejects), but the calendar itself does not.
+#    February 30th, month 13 and a non-leap February 29th (all of which RFC 3339 forbids and
+#    the zod validator rejects), but the calendar itself does not. It also supplies the
+#    year-domain exclusion: year 0000 is out, so the instant domain is 0001-9999.
 #
 # pydantic would accept a naive string on a plain ``str`` field, so the model enforces both
 # gates itself, mirroring the zod validator on the API side.
 _RFC3339_WITH_OFFSET = re.compile(
-    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})"
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)"
 )
 
 
