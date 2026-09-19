@@ -8,10 +8,17 @@ registry-declared ``audio.extract`` parameter schema (C5).
 
 Both parsers raise ``ValueError`` on rejection; pydantic v2's ``ValidationError`` subclasses
 ``ValueError``, so callers may catch either.
+
+The ``occurred_at`` check is deliberately two gates (fix F2, task 1.3a): the regex pins the
+RFC 3339 *grammar* (mandatory time offset with a ``:`` separator, seconds always present),
+and ``datetime.fromisoformat`` supplies the *calendar and offset-range* gate the grammar alone
+cannot — February 30th, month 13, a non-leap February 29th and a ``+24:00`` offset all match
+the regex but contradict the calendar. Neither gate alone would be correct.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 from typing import Literal
@@ -21,9 +28,18 @@ import pydantic
 # The only version this contract ships (design.md §7.1); a different literal is a contract change.
 ENVELOPE_TYPE_V1 = "mediaforge.job.dispatch.v1"
 
-# RFC 3339 (design.md §7.1): the time offset is mandatory, so a bare date or an offset-less
-# timestamp is not an RFC 3339 instant. pydantic would accept a naive string on a plain ``str``
-# field, so the model enforces the grammar itself, mirroring the zod validator on the API side.
+# RFC 3339 is enforced in two gates, because neither alone is sufficient (fix F2, task 1.3a):
+#
+# 1. the grammar gate below — the time offset is mandatory, so a bare date or an offset-less
+#    timestamp is not an RFC 3339 instant, the offset must carry the ``:`` separator
+#    (``fromisoformat`` alone would also accept out-of-band forms such as ``+0000``), and
+#    seconds are always present;
+# 2. a calendar and offset-range gate via ``datetime.fromisoformat`` — the regex accepts
+#    February 30th, month 13, a non-leap February 29th and a ``+24:00`` offset (all of which
+#    RFC 3339 forbids and the zod validator rejects), but the calendar itself does not.
+#
+# pydantic would accept a naive string on a plain ``str`` field, so the model enforces both
+# gates itself, mirroring the zod validator on the API side.
 _RFC3339_WITH_OFFSET = re.compile(
     r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})"
 )
@@ -57,10 +73,24 @@ class DispatchEnvelope(pydantic.BaseModel):
     @pydantic.field_validator("occurred_at")
     @classmethod
     def _occurred_at_must_be_rfc3339(cls, value: str) -> str:
+        # Gate 1, grammar: the regex pins the RFC 3339 shape — mandatory time offset with the
+        # ``:`` separator, seconds always present (see the module comment).
         if not _RFC3339_WITH_OFFSET.fullmatch(value):
             raise ValueError(
                 f"occurred_at must be an RFC 3339 instant with a time offset, got {value!r}"
             )
+        # Gate 2, calendar and offset range: the regex accepts impossible dates and offsets
+        # outside RFC 3339 (February 30th, month 13, a non-leap February 29th, ``+24:00``)
+        # that the calendar itself rejects; ``fromisoformat`` is the measured calendar gate
+        # (Python >= 3.11, which this package requires, accepts the ``Z`` suffix). It runs
+        # only after the grammar gate, because on its own it would accept forms RFC 3339 does
+        # not — for example ``2026-09-17T12:00:00+0000``, an offset without the colon.
+        try:
+            dt.datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError(
+                f"occurred_at is not a calendar-valid RFC 3339 instant, got {value!r}"
+            ) from exc
         return value
 
 

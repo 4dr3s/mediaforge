@@ -16,8 +16,9 @@ The envelope is a **notification, not the truth** (design.md §7.1): ``type``, `
   version would ack a message the relay will never re-publish (design.md §7.2 calls that the
   "silent eternity"), so partial processing is exactly as forbidden as ignoring it.
 
-C3 also requires the contract to be broker-agnostic: the last test scans the schema, the registry
-and every fixture for a fixed list of adapter-vocabulary tokens.
+C3 also requires the contract to be broker-agnostic: the last test scans the schema, the registry,
+every fixture and both validator modules for Redis adapter vocabulary (F3 narrowed that list to
+Redis machinery and added the three validator files as targets).
 
 The Python parser's surface differs from the TypeScript one on purpose (task 1.2's interface):
 ``parse_dispatch_envelope`` takes the *raw* message body (``str | bytes``), so envelopes are
@@ -42,22 +43,26 @@ from mediaforge.contracts import parse_audio_extract_params, parse_dispatch_enve
 
 # Repo-root ``contracts/`` directory: this file lives at <repo>/workers/media/tests/, so the
 # repo root is its third parent directory.
-CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+CONTRACTS_DIR = REPO_ROOT / "contracts"
 
-# The adapter vocabulary that must never reach the domain contract (C3). The list is the
-# dispatch's checklist verbatim -- including the misspelled ``xautoclave`` variant, on purpose:
-# the scan is vocabulary-presence, not spelling, and a contract file containing either spelling
-# is a leak.
+# The Redis adapter vocabulary that must never reach the domain contract (C3: the queue port is
+# broker-agnostic). The list names Redis machinery only -- ``xadd``, ``xreadgroup``, ``xack``
+# and ``xautoclaim`` are stream commands, ``xgroup`` the group machinery, ``delivery_count`` a
+# message field, and ``redis`` the broker itself. Words like ``consumer``, ``group`` or
+# ``stream`` are deliberately absent: the specification itself calls the two runtimes
+# "consumers" (C3's "the Python consumer"), so banning them would outlaw the domain's own
+# vocabulary, not the adapter's. Prose in the contract files and the validators may therefore
+# use the domain's words freely; the scan is for the adapter's machinery, and only in the
+# files that declare or implement the contract.
 FORBIDDEN_VOCABULARY = (
     "xadd",
     "xreadgroup",
-    "xautoclave",
+    "xack",
     "xautoclaim",
-    "consumer",
-    "group",
-    "stream",
-    "redis",
+    "xgroup",
     "delivery_count",
+    "redis",
 )
 
 # The only version this contract ships (design.md §7.1); a different literal is a contract change.
@@ -318,7 +323,43 @@ def test_job_types_registry_declares_audio_extract_exactly_as_the_spec_requires(
     assert params.get("required", []) == []
 
 
-def test_no_broker_vocabulary_in_schema_registry_or_fixtures() -> None:
+def test_schema_declares_the_contracts_semantics() -> None:
+    """F1: the schema file is the artifact C3 calls the contract, asserted on disk.
+
+    For a long time nothing applied it: both parity suites parsed fixtures -- pydantic here,
+    zod on the TypeScript side -- and the vocabulary scan read the file's *bytes*; neither
+    read its *semantics*, so the schema could drift (a fourth property, a ``const`` bumped
+    to v2, ``format: date`` instead of ``date-time``) while both gates stayed green. This
+    test pins the schema's semantics to what the rest of this file assumes, so the file
+    cannot become decoration again. The pydantic model is implemented against the same
+    facts; this is where the file and the model are forced to agree.
+    """
+    schema = read_json("dispatch-envelope.schema.json")
+    assert isinstance(schema, dict), "dispatch-envelope.schema.json must be a JSON object"
+
+    assert schema.get("type") == "object"
+    assert schema.get("additionalProperties") is False
+
+    # ``required`` and ``properties`` are compared order-insensitively: JSON member order is
+    # not significant, and neither is the order of ``required``.
+    required = schema.get("required")
+    assert isinstance(required, list), "required must be an array"
+    assert set(required) == {"job_id", "occurred_at", "type"}
+
+    properties = schema.get("properties")
+    assert isinstance(properties, dict), "properties must be an object"
+    assert set(properties) == {"job_id", "occurred_at", "type"}
+
+    type_decl = properties["type"]
+    assert isinstance(type_decl, dict), "properties.type must be an object"
+    assert type_decl.get("const") == ENVELOPE_TYPE_V1
+
+    occurred_at_decl = properties["occurred_at"]
+    assert isinstance(occurred_at_decl, dict), "properties.occurred_at must be an object"
+    assert occurred_at_decl.get("format") == "date-time"
+
+
+def test_no_broker_vocabulary_in_the_contract_or_validator_files() -> None:
     """C3: the domain contract must not name the adapter's machinery.
 
     The scan is substring-on-lowercase, which trips on a token anywhere -- including inside a
@@ -332,6 +373,12 @@ def test_no_broker_vocabulary_in_schema_registry_or_fixtures() -> None:
         *fixture_files("envelopes", "invalid"),
         *fixture_files("params", "valid"),
         *fixture_files("params", "invalid"),
+        # The two zod validators and the pydantic models are scanned too (F3): adapter
+        # vocabulary smuggled into a validator would leak into the contract's enforcement
+        # points, so the gate that keeps the contract broker-agnostic must watch them as well.
+        REPO_ROOT / "apps/api/src/contracts/envelope.ts",
+        REPO_ROOT / "apps/api/src/contracts/job-params.ts",
+        REPO_ROOT / "workers/media/src/mediaforge/contracts.py",
     ]
     offenders = []
     for path in targets:

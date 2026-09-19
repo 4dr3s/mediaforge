@@ -20,10 +20,16 @@
  * - the *rejection* of a `type` other than `mediaforge.job.dispatch.v1` — a consumer that
  *   ignores an unsupported version would ack a message the relay will never re-publish
  *   (design.md §7.2 calls that the "silent eternity"), so partial processing is exactly as
- *   forbidden as ignoring it.
+ *   forbidden as ignoring it;
+ * - the *schema semantics* suite — the file C3 calls the contract is read from disk and its
+ *   shape asserted (`additionalProperties: false`, the version `const`,
+ *   `format: date-time`, exactly the three properties), because until F1 nothing applied it:
+ *   the suite parsed fixtures with zod and the vocabulary scan read the file's bytes, and
+ *   neither noticed a drifted schema.
  *
  * C3 also requires the contract to be broker-agnostic; the last suite scans the schema, the
- * registry and every fixture for a fixed list of adapter-vocabulary tokens.
+ * registry, every fixture and both validator modules for the Redis adapter's vocabulary (F3
+ * narrowed the list to Redis machinery and added the three validator files as targets).
  *
  * Expected RED: `apps/api/src/contracts/` does not exist yet, so the two imports below cannot
  * resolve and this file fails to load; the fixture directories are equally absent, so every
@@ -43,22 +49,28 @@ import { parseDispatchEnvelope } from '../src/contracts/envelope';
 /** Repo-root `contracts/` directory, resolved from this file's own location (test/ → repo root). */
 const CONTRACTS_DIR = fileURLToPath(new URL('../../../contracts/', import.meta.url));
 
+/** Repo root, resolved from this file's own location (test/ → repo root). */
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+
 /**
- * The adapter vocabulary that must never reach the domain contract (C3). The list is the
- * dispatch's checklist verbatim — including the misspelled `xautoclave` variant, on purpose:
- * the scan is vocabulary-presence, not spelling, and a contract file containing either spelling
- * is a leak.
+ * The Redis adapter vocabulary that must never reach the domain contract (C3: the queue port
+ * is broker-agnostic). The list names Redis machinery only -- `xadd`, `xreadgroup`, `xack` and
+ * `xautoclaim` are stream commands, `xgroup` the group machinery, `delivery_count` a message
+ * field, and `redis` the broker itself. Words like `consumer`, `group` or `stream` are
+ * deliberately absent: the specification itself calls the two runtimes "consumers" (C3's "the
+ * Python consumer"), so banning them would outlaw the domain's own vocabulary, not the
+ * adapter's. Prose in the contract files and the validators may therefore use the domain's
+ * words freely; the scan is for the adapter's machinery, and only in the files that declare
+ * or implement the contract.
  */
 const FORBIDDEN_VOCABULARY = [
   'xadd',
   'xreadgroup',
-  'xautoclave',
+  'xack',
   'xautoclaim',
-  'consumer',
-  'group',
-  'stream',
-  'redis',
+  'xgroup',
   'delivery_count',
+  'redis',
 ];
 
 /** The only version this contract ships (design.md §7.1); a different literal is a contract change. */
@@ -305,8 +317,38 @@ describe('job-types.json :: the registry is data, not code (C1)', () => {
   });
 });
 
-describe('contract files :: broker-agnostic (C3)', () => {
-  it('contains none of the adapter vocabulary in the schema, the registry or any fixture', () => {
+describe('dispatch-envelope.schema.json :: the contract C3 names, asserted on disk (F1)', () => {
+  it('declares the exact shape and semantics every other assertion in this file assumes', () => {
+    // The schema is the artifact C3 calls "the contract", and for a long time nothing applied
+    // it: both parity suites parsed fixtures — zod here, pydantic on the Python side — and the
+    // vocabulary scan read the file's *bytes*; neither read its *semantics*, so the schema
+    // could drift (a fourth property, a `const` bumped to v2, `format: date` instead of
+    // `date-time`) while both gates stayed green. These assertions pin the schema's semantics
+    // to what the rest of this suite assumes, so the file cannot become decoration again. The
+    // zod validator is implemented against the same facts; this test is where the file and the
+    // parser are forced to agree.
+    const schema = readContract('dispatch-envelope.schema.json') as {
+      type: unknown;
+      additionalProperties: unknown;
+      required: unknown;
+      properties: Record<string, { const?: unknown; format?: unknown }>;
+    };
+
+    // The facts the rest of this file asserts after parsing are asserted here against the
+    // schema itself — same facts, same literals, expressed as the file's semantics instead of
+    // the parser's behaviour. `required` and `properties` are compared order-insensitively:
+    // JSON object member order is not significant, and neither is the order of `required`.
+    expect(schema.type).toBe('object');
+    expect(schema.additionalProperties).toBe(false);
+    expect([...(schema.required as unknown[])].sort()).toEqual(['job_id', 'occurred_at', 'type']);
+    expect(Object.keys(schema.properties).sort()).toEqual(['job_id', 'occurred_at', 'type']);
+    expect(schema.properties.type.const).toBe(ENVELOPE_TYPE_V1);
+    expect(schema.properties.occurred_at.format).toBe('date-time');
+  });
+});
+
+describe('contract and validator files :: broker-agnostic (C3)', () => {
+  it('contains no Redis adapter vocabulary in the schema, the registry, any fixture or either validator', () => {
     const targets = [
       join(CONTRACTS_DIR, 'dispatch-envelope.schema.json'),
       join(CONTRACTS_DIR, 'job-types.json'),
@@ -314,6 +356,12 @@ describe('contract files :: broker-agnostic (C3)', () => {
       ...fixtureFiles('envelopes', 'invalid'),
       ...fixtureFiles('params', 'valid'),
       ...fixtureFiles('params', 'invalid'),
+      // The two zod validators and the pydantic models are scanned too (F3): adapter
+      // vocabulary smuggled into a validator would leak into the contract's enforcement
+      // points, so the gate that keeps the contract broker-agnostic must watch them as well.
+      join(REPO_ROOT, 'apps/api/src/contracts/envelope.ts'),
+      join(REPO_ROOT, 'apps/api/src/contracts/job-params.ts'),
+      join(REPO_ROOT, 'workers/media/src/mediaforge/contracts.py'),
     ];
 
     const offenders: string[] = [];
