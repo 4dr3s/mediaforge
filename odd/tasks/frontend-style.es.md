@@ -15,6 +15,12 @@ trabajo `0b8e434` en `docs/frontend-style-decision`. Los tres ítems diferidos (
 cablear la entrada MCP, escribir la skill de estilo) son **features separadas, no residuos**: cada uno
 carga una aceptación en runtime que una tarea de Markdown no puede reclamar.
 
+**Enmendado el 2026-09-19, después de instalar y medir la herramienta (tarea 1.6).** Dos afirmaciones de
+este documento estaban mal: aseguraba que el servidor MCP era headless, y aseguraba una versión de `bun`
+que nunca midió. Ambas se corrigen en el lugar, dejando el texto original y etiquetando la corrección,
+porque borrar la frase equivocada escondería el hecho de que se escribió. La feature sigue `closed`: una
+corrección no es una reapertura.
+
 ---
 
 ## Por qué existe esta feature
@@ -118,6 +124,19 @@ Tres restricciones dan forma a la decisión, y ninguna de ellas es "la herramien
 dentro de WSL, sin ningún editor corriendo en el medio. El modo app — conectarse a un editor vivo — es
 una comodidad opt-in, no una dependencia del flujo.
 
+> **Enmendado el 2026-09-19 (tarea 1.6), después de medir.** La segunda mitad de esa frase es **falsa tal
+> como está escrita**. El servidor MCP *no* es headless: sin la aplicación de escritorio corriendo, una
+> herramienta de documento responde `OpenPencil app is not connected. STOP and tell the user: "The
+> OpenPencil desktop app is not running or no document is open."`, y el servidor llega a la app mediante
+> `OPENPENCIL_MCP_DISCOVERY_PATH` / `_SOCKET` / `_TCP` contra `127.0.0.1:7600`. Así que la afirmación
+> corregida es: **el CLI es headless; el MCP es un puente a la app de escritorio corriendo y es inerte sin
+> ella.** La primera mitad es correcta y salió mejor de lo escrito — la misma medición encontró que
+> `openpencil import page.html -o page.fig` convierte HTML/CSS/Tailwind en un `.fig` real sin nada
+> corriendo, lo que vuelve el escribir un mockup en HTML y convertirlo un camino de primera clase y no un
+> rodeo. Dos correcciones menores de la misma medición: `export -f jsx` es **por nodo** (`--node` es
+> obligatorio; sin él el CLI responde `Nothing to export`), que es comportamiento orientado a componentes
+> y no un defecto, y `--page` toma el **nombre** de una página, no un id.
+
 **La fuente de verdad del estilo son CSS custom properties en el repositorio.** El archivo de diseño es
 la superficie de autoría; los tokens son el artefacto. El pipeline va en una sola dirección y tiene un
 solo paso:
@@ -180,6 +199,21 @@ presentarse como el default. El flujo tiene que ser correcto sin GUI antes de se
 - **`bun` pasa a ser prerequisito** del flujo de diseño (`bun add -g @open-pencil/cli @open-pencil/mcp`).
   Medido presente: bun 1.3.14. Es un segundo package manager en un proyecto cuyo toolchain declarado es
   pnpm y uv, y el costo es real aunque sea chico.
+
+> **Enmendado el 2026-09-19 (tarea 1.6).** *"Medido presente: bun 1.3.14"* no se midió. Se copió de
+> `openspec/project.md`, que es exactamente la clase de afirmación que este repositorio no para de tener
+> que corregir — y ese archivo está obsoleto acá en al menos tres formas: `bun 1.3.14` y `node v25.2.1`
+> contra un medido **ningún bun en absoluto** y **node v25.9.0**, más un CLI de Docker que esta distro de
+> WSL no tiene. Lo que se midió: bun **no** está instalado en WSL — `~/.bun/bin` existía y estaba vacío,
+> la caché no, y del lado Windows solo existe `bun.exe` — así que se instaló, en **1.4.2**. La instalación
+> deliberadamente **no** usó `https://bun.sh/install`: ese script baja un zip de release y lo descomprime
+> **sin ninguna verificación de integridad más allá de TLS** (`grep -cE 'shasum|sha256|sha512|gpg|signature'`
+> devuelve `0`, y `unzip` ni siquiera está instalado en esta distro). El zip se bajó directo y se verificó
+> contra el `SHASUMS256.txt` publicado del release. Ambos paquetes quedan pineados en `0.15.1`, que es la
+> regla de este repositorio para los gates y aplica a una herramienta de diseño por la misma razón.
+> También medido: **`bunx` no existe** en bun 1.4.2, así que la forma de entrada que documenta el skill de
+> la propia herramienta (`{"command":"bunx","args":["openpencil-mcp"]}`) habría fallado en el primer
+> arranque; la forma que funciona es `bun x`.
 - **Una partición Windows/WSL** para quien elija el modo app, al menos hasta que todo el flujo viva de un
   solo lado de la frontera.
 - **El repositorio suma un formato de archivo de diseño que no es suyo.** Ver el riesgo residual abajo.
@@ -221,18 +255,18 @@ commits se prefirieron una vez que existió un commit.
 - **Estrategia:** `single-pr`. Un par de documentos, una unidad de trabajo, sin dependencia de ninguna
   otra rama.
 - **Pronóstico, corregido en el lugar:** el pronóstico era **menos de 400 líneas autoradas para el par**.
-  Medido: **1136** líneas autoradas (`frontend-style.md` 556,
-  `frontend-style.es.md` 580), solo adiciones — ambos archivos son nuevos, así que cada uno
+  Medido: **1302** líneas autoradas (`frontend-style.md` 637,
+  `frontend-style.es.md` 665), solo adiciones — ambos archivos son nuevos, así que cada uno
   aporta su conteo de líneas y cero eliminaciones. El pronóstico se equivocó por un factor de
-  2.8 y queda visible acá en vez de sobrescrito, que es la regla que este bullet se fijó a sí
+  3.3 y queda visible acá en vez de sobrescrito, que es la regla que este bullet se fijó a sí
   mismo cuando falló.
-- **El espejo es 51.1% del costo** — 580 de 1136 líneas. Eso reproduce la
+- **El espejo es 51.1% del costo** — 665 de 1302 líneas. Eso reproduce la
   constante que `odd-doc-structure` §1.1 midió a lo largo de cuatro features (el espejo en ~49–51% de
   cada par), que ahora son cinco features y la misma constante. Es el costo de entrega que ningún
   documento de este repositorio había contado antes de esa feature, y es la razón por la que un
   presupuesto de 400 líneas y un *documento* de 400 líneas no son lo mismo.
-- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1136 líneas, el par
-  queda en 2.84× el presupuesto advisory de 400. Acá no hay nada inflado y nada se va a
+- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1302 líneas, el par
+  queda en 3.25× el presupuesto advisory de 400. Acá no hay nada inflado y nada se va a
   encoger para llegar a 400: los dos archivos son un documento de decisión y su copia de estudio
   requerida, y recortar cualquiera de los dos para entrar en el número eliminaría la decisión o la regla
   del espejo. La lectura honesta es que el presupuesto de 400 es una unidad de *review* para código, y
@@ -241,8 +275,8 @@ commits se prefirieron una vez que existió un commit.
 - **Fronteras de slice:** ninguna, porque no hacen falta. El trabajo es un par de documentos; no hay nada
   que apilar. Aterrizó como **una unidad de trabajo, `0b8e434`**, un commit por delante de `origin/main`, y
   el registro de cierre en §1.5 es el commit inmediatamente siguiente en la misma rama — que es por lo que
-  el propio commit de la entrada de cierre no se nombra en ningún lado: no se puede. Dos commits, una
-  rama, sin apilado.
+  el propio commit de la entrada de cierre no se nombra en ningún lado: no se puede. Una rama, y
+  sin apilado; la tarea 1.6 sumó su propio commit después.
 - **No entregado por esta feature:** la instalación de la herramienta, la entrada MCP del harness,
   cualquier valor de estilo y el scaffold de Next.js. Ver *Fuera de alcance*.
 
@@ -307,10 +341,13 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | 1.3 | Espejo en español, bloques idénticos byte a byte | `[x]` | §1.3 |
 | 1.4 | Verificación, mecánica y registrada | `[x]` | §1.4 |
 | 1.5 | Cierre | `[x]` | §1.5 |
+| 1.6 | Corregir las dos afirmaciones refutadas | `[x]` | §1.6 |
 
 La tarea 1.5 está `[x]` porque la unidad de trabajo que estaba esperando existe: `0b8e434`. La entrada de
 cierre en §1.5 registra el commit, y registra honestamente que su propio commit queda necesariamente
-fuera del rango que describe — esta entrada no puede nombrar el commit que la contiene.
+fuera del rango que describe — esta entrada no puede nombrar el commit que la contiene. La tarea 1.6 se
+agregó después del cierre, sobre el precedente de `odd-doc-structure` §1.3a: un defecto encontrado después
+de cerrar es su propia unidad de trabajo, nunca una reescritura silenciosa de un registro cerrado.
 
 ## Log de evidencia
 
@@ -426,11 +463,11 @@ cambios.
 Medido, en este orden:
 
 - **Contraejemplo, sobre la copia modificada:** el hash de la corrida del contraejemplo **difiere** del
-  hash de la corrida en inglés (`b8c2c8d9c848e5a00877ad81cf23df17` contra `3f3ddd21d28c3ac9ad7c0f9851e114ee`). Esa divergencia es la única
+  hash de la corrida en inglés (`2118392227012d003175213b9928143a` contra `583cbb563acc4df760201076c26bee28`). Esa divergencia es la única
   propiedad que importa acá: un chequeo cuyo modo de falla nunca se observó todavía no es un chequeo
   (defecto D1).
-- **Inglés, la corrida real:** `3f3ddd21d28c3ac9ad7c0f9851e114ee`
-- **Espejo en español, la corrida real:** `3f3ddd21d28c3ac9ad7c0f9851e114ee` — idéntico al inglés, o el espejo está mal y esta
+- **Inglés, la corrida real:** `583cbb563acc4df760201076c26bee28`
+- **Espejo en español, la corrida real:** `583cbb563acc4df760201076c26bee28` — idéntico al inglés, o el espejo está mal y esta
   feature no está terminada.
 
 **Este valor se movió una vez, y el viejo queda visible.** Antes de que la entrada de cierre en §1.5
@@ -441,46 +478,12 @@ queda registrada acá en vez de sobrescrita — la misma regla que sigue el pron
 #### 1.4b — los chequeos
 
 ```text
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    printf '%s: ## headings=%s, fenced blocks=%s\n' "$f" \
-      "$(grep -c '^## ' $f)" "$(( $(grep -c '^```' $f) / 2 ))"
-  done
-odd/tasks/frontend-style.md: ## headings=14, fenced blocks=5
-odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=5
-
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    printf '%s -> ' "$(basename $f)"
-    grep '^## Delivery$\|^## Progress$\|^## Next step$' $f | tr '\n' ' '; echo
-  done
-frontend-style.md -> ## Delivery ## Progress ## Next step 
-frontend-style.es.md -> ## Delivery ## Progress ## Next step 
-
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
-      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
-      [ -z "$id" ] && continue
-      if grep -q "^### $id" "$f"; then echo "$(basename $f): §$id OK"; else echo "$(basename $f): §$id MISSING"; fi
-    done
-  done
-frontend-style.md: §1.1 OK
-frontend-style.md: §1.2 OK
-frontend-style.md: §1.3 OK
-frontend-style.md: §1.4 OK
-frontend-style.md: §1.5 OK
-frontend-style.es.md: §1.1 OK
-frontend-style.es.md: §1.2 OK
-frontend-style.es.md: §1.3 OK
-frontend-style.es.md: §1.4 OK
-frontend-style.es.md: §1.5 OK
-
-$ printf 'open Progress state rows marked [ ]: %s (EN), %s (ES)\n' \
-    "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.md | wc -l)" \
-    "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.es.md | wc -l)"
-open Progress state rows marked [ ]: 0 (EN), 0 (ES)
-
-$ git status --short
- M odd/tasks/frontend-style.es.md
- M odd/tasks/frontend-style.md
+headings   : same count in both -> equal
+fences     : same count in both -> equal
+blocks md5 : EN vs ES -> equal
+field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
+pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+open rows  : EN=0 ES=0 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
 
 Los headings de campo se listan sin números de línea a propósito: el bloque que carga esta salida también
@@ -488,6 +491,16 @@ mueve esos números, así que un número de línea absoluto registrado acá esta
 pasada de escritura que lo escribió. El orden y el texto textual son lo que el chequeo busca, y ambos son
 estables. El escaneo de `[x]` resuelve cada fila marcada contra un heading `### <id>` en el mismo
 documento — cinco filas, cinco resoluciones, por archivo.
+
+**Este bloque afirma invariantes a propósito, y no siempre fue así.** Su primera forma registraba conteos
+absolutos (`fenced blocks=4`, después `5`) y una instantánea de `git status`, así que cada edición
+posterior de este documento hacía que la salida registrada dejara de reproducir — el mismísimo defecto que
+esta feature salió a cazar, autoprovocado en su propia verificación. Ahora afirma solo relaciones: mismo
+conteo de headings, mismo conteo de fences, contenido en fence idéntico, mismos headings de campo, cero
+punteros sin resolver, cero filas abiertas. Ninguna de ellas se mueve por agregar una sección, un bloque o
+un commit. Lo único que no puede afirmar es su propio hash — está dentro del contenido que ese hash cubre
+— así que ese valor vive en §1.4a, en prosa, y es la única cifra de este documento que una edición
+posterior invalida.
 
 **Un criterio de aceptación ahora pasa de forma vacua, y eso se registra en vez de contarse como un
 aprobado.** La tarea 1.4 exige que cada `[ ]` cargue una razón declarada. Con la entrada de cierre en
@@ -497,12 +510,32 @@ categoría que el defecto D1 registrado en este repositorio — un gate sobre un
 — y se anota en vez de reportarse como chequeo verde. El criterio se queda en el texto de la tarea porque
 una tarea reabierta lo necesitaría de nuevo.
 
+### 1.6 — Corregir las dos afirmaciones que la medición refutó · owner: AI
+
+Esta feature se cerró sobre dos afirmaciones que ninguna medición sostenía, y ambas aparecieron en la
+feature siguiente `openpencil-setup` cuando instaló la herramienta: que el servidor MCP es headless, y que
+`bun` está presente en 1.3.14. La segunda se heredó de `openspec/project.md` y nunca se chequeó acá.
+
+Corregidas en el lugar, dejando las frases originales y etiquetando las enmiendas, y con el bloque de
+chequeos de §1.4b reconstruido para que afirme invariantes en vez de conteos que cada edición posterior
+invalida.
+
+El propio texto de la tarea 1.5 dice que la feature **no** se declara `closed` mientras los ítems
+diferidos sigan sin empezar. Ese texto queda en pie y la tensión se resuelve acá en vez de editarse: los
+ítems no son trabajo pendiente de este documento, son tres features separadas con su propia aceptación en
+runtime, y §1.5 registra ese razonamiento. Si en cambio se los trata como residuos, la condición de la
+tarea 1.5 no se cumple y la línea de estado está mal — el lector tiene las dos lecturas y el razonamiento
+para elegir.
+
+**Aceptación:** cada corrección dice qué se midió, nombra el comando e identifica la afirmación que
+reemplaza; el texto original queda visible; y §1.6 registra salida cruda y no un resumen.
+
 La medición de líneas autoradas vive en *Delivery* y abajo, en prosa, por la misma razón que los hashes:
 un número escrito dentro de un bloque en fence es parte del contenido que el hash de ese bloque cubre, y
 el tamaño de este documento es justamente lo que se está midiendo.
 
-**Líneas autoradas, esta unidad de trabajo:** 1136 en total — 556 en
-`frontend-style.md` y 580 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
+**Líneas autoradas, esta unidad de trabajo:** 1302 en total — 637 en
+`frontend-style.md` y 665 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
 son nuevos y por lo tanto aportan cero eliminaciones. Medido con `wc -l` contra la copia de trabajo,
 después de toda otra edición de esta pasada; la sustitución que escribió estos números reemplazó tokens
 en el lugar, así que no cambió ni el conteo de líneas ni el contenido en fence que cubre el hash de
@@ -542,6 +575,58 @@ instalación, entrada de harness, skill de estilo — son el *Next step*, y son 
 propósito: dos de ellas tienen criterios de aceptación en runtime (el CLI responde `openpencil --help`; el
 servidor MCP responde a una llamada real de un cliente con `OPENPENCIL_MCP_ROOT` confinado) que ninguna
 tarea de Markdown puede satisfacer ni evidenciar.
+
+### 1.6 — las dos afirmaciones refutadas y el bloque invariante (2026-09-19)
+
+Salida cruda, sin editar. Las dos afirmaciones falsadas, medidas:
+
+```text
+$ which bun || echo "command -v bun: nada"
+command -v bun: nada
+
+$ ls -A ~/.bun/bin
+                                # empty: the binary was gone, the cache in ~/.bun/install was not
+
+$ ls /mnt/c/Users/andre/.bun/bin/bun.exe
+/mnt/c/Users/andre/.bun/bin/bun.exe   # the only bun on this machine lives on the Windows side
+
+$ grep -cE 'shasum|sha256|sha512|gpg|signature' /tmp/bun-install.sh
+0                               # bun.sh/install verifies nothing beyond TLS
+
+$ sha256sum /tmp/bun.zip
+36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913  /tmp/bun.zip
+$ grep -E 'bun-linux-x64\.zip$' /tmp/SHASUMS256.txt
+36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913  bun-linux-x64.zip
+
+$ ~/.bun/bin/bun --version
+1.4.2
+
+$ printf '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_file","arguments":{"path":"/etc/hosts"}}}' | bun x openpencil-mcp
+{"error":"Path is outside the allowed root: .../apps/web/design"}
+
+$ printf '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_file","arguments":{"path":"/tmp/opnroot/inside.fig"}}}' | bun x openpencil-mcp
+{"error":"OpenPencil app is not connected. STOP and tell the user: ..."}
+```
+
+Las últimas dos líneas son el par que hace la corrección: la primera muestra el confinamiento sosteniéndose,
+la segunda muestra que el servidor es un puente a la app y no un lector de archivos. Un test que solo
+hubiera corrido la primera habría confirmado la propiedad de seguridad y se habría perdido el error de
+arquitectura.
+
+Ese transcript es una **captura, no una receta**: `ls -A ~/.bun/bin` hoy lista el binario, porque
+instalarlo es lo que cambió esa línea. Lo que nunca debe moverse es el par de líneas de sha256, y son la
+razón por la que la instalación evitó el script del vendor.
+
+**A qué se elevó "verificado".** Antes de esta tarea, el confinamiento era un requisito declarado en prosa.
+Ahora es un rechazo observado, y la afirmación headless es un fallo observado en vez de un supuesto de
+diseño. Ninguna de las dos cosas era cierta de la afirmación anterior de este documento, que es el punto
+entero de la tarea.
+
+**No verificado, y registrado como tal en vez de insinuado.** No se probó si el servidor MCP del lado WSL
+puede alcanzar una aplicación de escritorio corriendo del lado Windows: el camino de descubrimiento
+`127.0.0.1:7600` cruza la frontera de WSL, la app no estaba corriendo, y el auto-arranque que lo expondría
+requiere `@open-pencil/mcp` instalado **en Windows**, que no lo está. Eso es una pregunta abierta para
+quien primero quiera control en vivo de la app, no algo resuelto que este documento pueda afirmar.
 
 ## Fuera de alcance
 

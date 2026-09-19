@@ -13,6 +13,12 @@
 MCP entry, writing the style skill) are **separate features, not residues**: each carries a runtime
 acceptance that a Markdown task cannot claim.
 
+**Amended 2026-09-19, after the tool was installed and measured (task 1.6).** Two claims this document
+made were wrong: it asserted the MCP server was headless, and it asserted a `bun` version it had never
+measured. Both are corrected in place below, with the original wording kept and the correction labelled,
+because deleting the wrong sentence would hide the fact that it was written. The feature stays `closed`:
+a correction is not a reopening.
+
 ---
 
 ## Why this feature exists
@@ -110,6 +116,19 @@ disk, read and written through `openpencil` (CLI) and `openpencil-mcp` (stdio MC
 running editor in the loop. App mode — connecting to a live editor — is an opt-in convenience, not a
 dependency of the workflow.
 
+> **Amended 2026-09-19 (task 1.6), after measuring.** The second half of that sentence is **false as
+> written**. The MCP server is *not* headless: with no desktop application running, a document tool
+> answers `OpenPencil app is not connected. STOP and tell the user: "The OpenPencil desktop app is not
+> running or no document is open."`, and the server reaches the app through
+> `OPENPENCIL_MCP_DISCOVERY_PATH` / `_SOCKET` / `_TCP` against `127.0.0.1:7600`. So the corrected claim is:
+> **the CLI is headless; the MCP is a bridge to the running desktop app and is inert without it.** The
+> first half is correct and came out better than written — the same measurement found that
+> `openpencil import page.html -o page.fig` turns HTML/CSS/Tailwind into a real `.fig` with nothing
+> running, which makes writing a mockup in HTML and converting it a first-class path rather than a
+> workaround. Two smaller corrections from the same measurement: `export -f jsx` is **per node**
+> (`--node` is required; without it the CLI answers `Nothing to export`), which is component-oriented
+> behaviour rather than a defect, and `--page` takes a page **name**, not an id.
+
 **The style's source of truth is CSS custom properties in the repository.** The design file is the
 authoring surface; the tokens are the artifact. The pipeline is one direction and has one step:
 
@@ -171,6 +190,21 @@ workflow has to be correct without a GUI before it is convenient with one.
 - **`bun` becomes a prerequisite** of the design workflow (`bun add -g @open-pencil/cli @open-pencil/mcp`).
   Measured present: bun 1.3.14. It is a second package manager in a project whose declared toolchain is
   pnpm and uv, and the cost is real even when it is small.
+
+> **Amended 2026-09-19 (task 1.6).** *"Measured present: bun 1.3.14"* was not measured. It was copied
+> from `openspec/project.md`, which is precisely the class of claim this repository keeps having to
+> correct — and that file is stale here in at least three ways: `bun 1.3.14` and `node v25.2.1` against a
+> measured **no bun at all** and **node v25.9.0**, plus a Docker CLI this WSL distro does not have. What
+> was measured: bun is **not** installed in WSL — `~/.bun/bin` existed and was empty, the cache was not,
+> and only `bun.exe` exists on the Windows side — so it was installed, at **1.4.2**. The installation
+> deliberately did **not** use `https://bun.sh/install`: that script downloads a release zip and unzips it
+> with **no integrity check beyond TLS** (`grep -cE 'shasum|sha256|sha512|gpg|signature'` returns `0`, and
+> `unzip` is not even installed in this distro). The zip was fetched directly and verified against the
+> release's published `SHASUMS256.txt` instead. Both packages are pinned at `0.15.1`, which is this
+> repository's rule for gates and applies to a design tool for the same reason. Also measured: **`bunx`
+> does not exist** in bun 1.4.2, so the entry form the tool's own skill documents
+> (`{"command":"bunx","args":["openpencil-mcp"]}`) would have failed at the first start; the working
+> form is `bun x`.
 - **A Windows/WSL split** for anyone choosing app mode, at least until the whole workflow lives on one
   side of the boundary.
 - **The repository gains a design file format it does not own.** See residual risk below.
@@ -210,17 +244,17 @@ commit existed.
 
 - **Strategy:** `single-pr`. One document pair, one work unit, no dependency on any other branch.
 - **Forecast, corrected in place:** the forecast was **under 400 authored lines for the pair**. Measured:
-  **1136** authored lines (`frontend-style.md` 556, `frontend-style.es.md`
-  580), additions only — both files are new, so each contributes its line count and zero
-  deletions. The forecast was wrong by a factor of 2.8 and is kept visible here rather than
+  **1302** authored lines (`frontend-style.md` 637, `frontend-style.es.md`
+  665), additions only — both files are new, so each contributes its line count and zero
+  deletions. The forecast was wrong by a factor of 3.3 and is kept visible here rather than
   overwritten, which is the rule this bullet set for itself when it was wrong.
-- **The mirror is 51.1% of the cost** — 580 of 1136 lines. That
+- **The mirror is 51.1% of the cost** — 665 of 1302 lines. That
   reproduces the constant `odd-doc-structure` §1.1 measured across four features (the mirror at ~49–51%
   of every pair), which is now five features and the same constant. It is the delivery cost no document
   in this repository had counted before that feature, and it is why a 400-line budget and a 400-line
   *document* are not the same thing.
-- **The budget is exceeded, and that is reported rather than argued away.** At 1136 lines the
-  pair sits at 2.84× the 400-line advisory budget. Nothing here is padded and nothing will be
+- **The budget is exceeded, and that is reported rather than argued away.** At 1302 lines the
+  pair sits at 3.25× the 400-line advisory budget. Nothing here is padded and nothing will be
   shrunk to reach 400: the two files are one decision document and its required study copy, and cutting
   either to fit the number would delete the decision or the mirror rule. The honest reading is that the
   400-line budget is a *review* unit for code, and that this repository's mirror convention has been
@@ -229,7 +263,7 @@ commit existed.
 - **Slice boundaries:** none, because none are needed. The work is one document pair; there is nothing
   to stack. It landed as **one work unit, `0b8e434`**, one commit ahead of `origin/main`, and the closure
   record in §1.5 is the immediately following commit on the same branch — which is why the closure entry's
-  own commit is not named anywhere: it cannot be. Two commits, one branch, no stack.
+  own commit is not named anywhere: it cannot be. One branch, and no stack; task 1.6 added its own commit later.
 - **Not delivered by this feature:** the installation of the tool, the harness MCP entry, any style
   value, and the Next.js scaffold. See *Out of scope*.
 
@@ -281,6 +315,24 @@ by the closure record. **Not** declared `closed` while the deferred items in *Ou
 unstarted: they are separate features, and this document says so instead of implying they are pending
 work here.
 
+### 1.6 — Correct the two claims the measurement refuted · owner: AI
+
+This feature was closed on two claims that no measurement supported, and both surfaced in the follow-up
+feature `openpencil-setup` when it installed the tool: that the MCP server is headless, and that `bun` is
+present at 1.3.14. The second was inherited from `openspec/project.md` and never checked here.
+
+Corrected in place, with the original sentences kept and the amendments labelled, and with the §1.4b check
+block rebuilt so it asserts invariants instead of counts every later edit invalidates.
+
+Task 1.5's own text says the feature is **not** declared `closed` while the deferred items remain
+unstarted. That text is left standing and the tension is resolved here rather than edited away: the items
+are not pending work on this document, they are three separate features with their own runtime
+acceptance, and §1.5 records that reasoning. If they are instead treated as residues, task 1.5's condition
+is unmet and the status line is wrong — the reader gets both readings and the reasoning to choose.
+
+**Acceptance:** each correction says what was measured, names the command, and identifies the claim it
+replaces; the original wording stays visible; and §1.6 records raw output rather than a summary.
+
 ## Progress
 
 State is `[x]` only where the evidence log holds observed proof for that task.
@@ -292,10 +344,13 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.3 | Spanish mirror, blocks byte-identical | `[x]` | §1.3 |
 | 1.4 | Verification, mechanical and recorded | `[x]` | §1.4 |
 | 1.5 | Closure | `[x]` | §1.5 |
+| 1.6 | Correct the two refuted claims | `[x]` | §1.6 |
 
 Task 1.5 is `[x]` because the work unit it was waiting on exists: `0b8e434`. The closure entry in §1.5
 records the commit, and records honestly that its own commit is necessarily outside the range it
-describes — this entry cannot name the commit that contains it.
+describes — this entry cannot name the commit that contains it. Task 1.6 was added after closure, on the
+`odd-doc-structure` §1.3a precedent: a defect found after closing is its own work unit, never a silent
+rewrite of a closed record.
 
 ## Evidence log
 
@@ -408,10 +463,10 @@ value written in prose leaves the fenced content — and therefore the hash — 
 Measured, in this order:
 
 - **Counter-example, on the modified copy:** the counter run's hash **differs** from the English run's
-  hash (`b8c2c8d9c848e5a00877ad81cf23df17` against `3f3ddd21d28c3ac9ad7c0f9851e114ee`). That divergence is the only property that matters
+  hash (`2118392227012d003175213b9928143a` against `583cbb563acc4df760201076c26bee28`). That divergence is the only property that matters
   here: a check whose failure mode has never been observed is not yet a check (defect D1).
-- **English, the real run:** `3f3ddd21d28c3ac9ad7c0f9851e114ee`
-- **Spanish mirror, the real run:** `3f3ddd21d28c3ac9ad7c0f9851e114ee` — identical to the English, or the mirror is wrong
+- **English, the real run:** `583cbb563acc4df760201076c26bee28`
+- **Spanish mirror, the real run:** `583cbb563acc4df760201076c26bee28` — identical to the English, or the mirror is wrong
   and this feature is not done.
 
 **This value moved once, and the old one stays visible.** Before the closure entry in §1.5 added its own
@@ -422,46 +477,12 @@ overwritten — the same rule the *Delivery* forecast follows.
 #### 1.4b — the checks
 
 ```text
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    printf '%s: ## headings=%s, fenced blocks=%s\n' "$f" \
-      "$(grep -c '^## ' $f)" "$(( $(grep -c '^```' $f) / 2 ))"
-  done
-odd/tasks/frontend-style.md: ## headings=14, fenced blocks=5
-odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=5
-
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    printf '%s -> ' "$(basename $f)"
-    grep '^## Delivery$\|^## Progress$\|^## Next step$' $f | tr '\n' ' '; echo
-  done
-frontend-style.md -> ## Delivery ## Progress ## Next step 
-frontend-style.es.md -> ## Delivery ## Progress ## Next step 
-
-$ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
-    awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[x\]/ {print}' "$f" | while read -r row; do
-      id=$(printf '%s' "$row" | awk -F'|' '{gsub(/^[ \t]*§?[ \t]*|[ \t]+$/,"",$5); print $5}')
-      [ -z "$id" ] && continue
-      if grep -q "^### $id" "$f"; then echo "$(basename $f): §$id OK"; else echo "$(basename $f): §$id MISSING"; fi
-    done
-  done
-frontend-style.md: §1.1 OK
-frontend-style.md: §1.2 OK
-frontend-style.md: §1.3 OK
-frontend-style.md: §1.4 OK
-frontend-style.md: §1.5 OK
-frontend-style.es.md: §1.1 OK
-frontend-style.es.md: §1.2 OK
-frontend-style.es.md: §1.3 OK
-frontend-style.es.md: §1.4 OK
-frontend-style.es.md: §1.5 OK
-
-$ printf 'open Progress state rows marked [ ]: %s (EN), %s (ES)\n' \
-    "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.md | wc -l)" \
-    "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.es.md | wc -l)"
-open Progress state rows marked [ ]: 0 (EN), 0 (ES)
-
-$ git status --short
- M odd/tasks/frontend-style.es.md
- M odd/tasks/frontend-style.md
+headings   : same count in both -> equal
+fences     : same count in both -> equal
+blocks md5 : EN vs ES -> equal
+field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
+pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+open rows  : EN=0 ES=0 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
 
 The field headings are listed without line numbers on purpose: the block that carries this output
@@ -469,6 +490,15 @@ also moves those numbers, so an absolute line number recorded here would be stal
 authoring pass that wrote it. Order and verbatim text are what the check is for, and both are stable.
 The `[x]` scan resolves every marked row against a `### <id>` heading in the same document — five rows,
 five resolutions, per file.
+
+**This block asserts invariants on purpose, and it did not always.** Its first form recorded absolute
+counts (`fenced blocks=4`, then `5`) and a `git status` snapshot, so every later edit to this document
+made the recorded output stop reproducing — the very defect this feature set out to hunt, self-inflicted
+on its own verification. It now asserts only relations: same heading count, same fence count, identical
+fenced content, same field headings, zero unresolved pointers, zero open rows. None of those can be moved
+by adding a section, a block or a commit. The one thing it cannot assert is its own hash — it sits inside
+the content that hash covers — so that value lives in §1.4a, in prose, and is the only figure in this
+document a later edit invalidates.
 
 **One acceptance criterion now passes vacuously, and that is recorded rather than counted as a pass.**
 Task 1.4 demands that every `[ ]` carry a stated reason. With the closure entry in §1.5, this document has
@@ -481,8 +511,8 @@ The authored-line measurement lives in *Delivery* and below, in prose, for the s
 do: a number written inside a fenced block is part of the content that block's hash covers, and this
 document's own size is what is being measured.
 
-**Authored lines, this work unit:** 1136 total — 556 in `frontend-style.md`
-and 580 in `frontend-style.es.md`, additions only, since both files are new and therefore
+**Authored lines, this work unit:** 1302 total — 637 in `frontend-style.md`
+and 665 in `frontend-style.es.md`, additions only, since both files are new and therefore
 contribute zero deletions. Measured with `wc -l` against the working tree, after every other edit in this
 pass; the substitution that wrote these numbers replaced tokens in place, so it changed neither the line
 count nor the fenced content the hash above covers. That is the reason the numbers can be exact here
@@ -520,6 +550,57 @@ recorded for its slice 1.7, and it is stated rather than hidden.
 harness entry, style skill — are the *Next step*, and they are separate features on purpose: two of them
 have runtime acceptance criteria (the CLI answers `openpencil --help`; the MCP server answers a real
 client call with `OPENPENCIL_MCP_ROOT` confined) that no Markdown task can satisfy or evidence.
+
+### 1.6 — the two refuted claims and the invariant block (2026-09-19)
+
+Raw output, unedited. The two falsified claims, measured:
+
+```text
+$ which bun || echo "command -v bun: nada"
+command -v bun: nada
+
+$ ls -A ~/.bun/bin
+                                # empty: the binary was gone, the cache in ~/.bun/install was not
+
+$ ls /mnt/c/Users/andre/.bun/bin/bun.exe
+/mnt/c/Users/andre/.bun/bin/bun.exe   # the only bun on this machine lives on the Windows side
+
+$ grep -cE 'shasum|sha256|sha512|gpg|signature' /tmp/bun-install.sh
+0                               # bun.sh/install verifies nothing beyond TLS
+
+$ sha256sum /tmp/bun.zip
+36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913  /tmp/bun.zip
+$ grep -E 'bun-linux-x64\.zip$' /tmp/SHASUMS256.txt
+36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913  bun-linux-x64.zip
+
+$ ~/.bun/bin/bun --version
+1.4.2
+
+$ printf '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_file","arguments":{"path":"/etc/hosts"}}}' | bun x openpencil-mcp
+{"error":"Path is outside the allowed root: .../apps/web/design"}
+
+$ printf '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_file","arguments":{"path":"/tmp/opnroot/inside.fig"}}}' | bun x openpencil-mcp
+{"error":"OpenPencil app is not connected. STOP and tell the user: ..."}
+```
+
+The last two lines are the pair that makes the correction: the first shows the confinement holding, the
+second shows the server is a bridge to the app and not a file reader. A test that only ran the first would
+have confirmed the security property and missed the architectural error.
+
+That transcript is a **capture, not a recipe**: `ls -A ~/.bun/bin` lists the binary now, because
+installing it is what changed that line. The part that must never drift is the pair of sha256 lines, and
+they are the reason the install skipped the vendor's own script.
+
+**What "verified" was upgraded to mean.** Before this task, the confinement was a requirement stated in
+prose. It is now an observed refusal, and the headless claim is now an observed failure rather than a
+design assumption. Neither was true of the previous claim in this document, which is the whole point of
+the task.
+
+**Not verified, and recorded as such rather than implied.** Whether the WSL-side MCP server can reach a
+desktop application running on the Windows side was not tested: the `127.0.0.1:7600` discovery path
+crosses the WSL boundary, the app was not running, and the auto-start that would expose it requires
+`@open-pencil/mcp` installed **on Windows**, which it is not. That is an open question for whoever first
+wants live app control, not a solved one this document may claim.
 
 ## Out of scope
 
