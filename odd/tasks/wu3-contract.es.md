@@ -145,6 +145,41 @@ resultante con un verificador independiente. El tier esperado es `unassessable`-
 candidatos sin señal de riesgo (el defecto registrado en `repo-hygiene.md`); un tier distinto es
 información nueva para el log.
 
+### 1.3a — Aplicar el plan de fixes del verificador: que el gate aplique el contrato que dice aplicar · owner: IA
+
+Agregada el 2026-09-19, a partir de §1.3. Esta tarea existe porque las refutaciones del verificador
+independiente se aceptaron como correctas y quedaron en pie: la tarea 1.3 está `[x]` por haber
+*corrido*, y lo que refutó es exactamente el trabajo de esta tarea. El ID lleva el sufijo `a` en vez de
+un número nuevo porque `odd-doc-structure.es.md:26` ya cita "la tarea 1.4 (Cierre)" de este documento,
+y renumerar invalidaría en silencio una referencia que sostiene otro documento.
+
+- **F1 — afirmar la semántica del schema, en las dos suites.** `contracts/dispatch-envelope.schema.json`
+es el artefacto que C3 llama el contrato, y era el único artefacto que ningún gate aplicaba: mutarlo
+(una cuarta propiedad permitida, el `const` de versión cambiado a `...v2`, `format: date-time`
+cambiado a `date`) pasaba las dos suites sin tocarlas. Las dos suites de paridad deben leer el archivo
+del schema y afirmar `additionalProperties: false`, el `const` de versión igual a
+`mediaforge.job.dispatch.v1`, `format: date-time` en `occurred_at`, `type: object`, y exactamente las
+tres propiedades `type`, `job_id`, `occurred_at` — requeridas las mismas tres.
+- **F2 — medir la paridad sobre el dominio, no sobre la muestra.** El lado de Python valida RFC 3339
+con un regex pelado, así que acepta cuatro documentos que zod rechaza, y los fixtures entregados nunca
+ejercitan la diferencia. Reemplazar la comprobación sólo por regex por gramática **más** validación con
+conocimiento de calendario (el regex queda como compuerta de gramática; `datetime.fromisoformat`
+aporta la compuerta de calendario y de rango de offset), y agregar los cuatro fixtures faltantes a
+`contracts/fixtures/envelopes/invalid/`: una fecha imposible, un mes inválido, un 29 de febrero de año
+no bisiesto, y un offset fuera de RFC 3339 (`+24:00`).
+- **F3 — el scan debe nombrar al adaptador y cubrir los validadores.** Reducir el vocabulario prohibido
+a tokens específicos de Redis (`xadd`, `xreadgroup`, `xack`, `xautoclaim`, `xgroup`, `delivery_count`,
+`redis`) — prohibir `consumer` era prohibir la propia palabra del dominio para el lado de Python, que
+el texto de C3 usa — y extender el scan a los dos módulos de validadores:
+`apps/api/src/contracts/envelope.ts`, `apps/api/src/contracts/job-params.ts` y
+`workers/media/src/mediaforge/contracts.py`.
+
+**Aceptación:** las dos suites de paridad pasan, y cada fix *demuestra atrapar el caso para el que se
+escribió*, por mutación y no por reporte: F1 falla cuando el schema se muta de a una propiedad y vuelve
+a pasar cuando se revierte; F2 falla en los cuatro fixtures nuevos antes de que exista la comprobación
+de calendario y pasa después; F3 falla cuando se planta un token de Redis en cualquiera de los dos
+módulos de validadores. Las mutaciones se revierten, y la salida cruda de cada corrida está en §1.3a.
+
 ### 1.4 — Cierre · owner: IA
 
 `contracts/README.md` y el documento de la feature coinciden con lo que existe; la copia `.es.md` se
@@ -162,11 +197,12 @@ medida que el trabajo corría.
 | 1.1 | RED: las dos suites de paridad | `[x]` | §1.1 |
 | 1.2 | GREEN: el contrato, el registry, los fixtures y los dos validadores | `[x]` | §1.2 |
 | 1.3 | Conformidad con el RDD, por unidad de trabajo | `[x]` | §1.3 |
-| 1.4 | Cierre | `[ ]` | — **no cerrada**: el plan de fixes del verificador (F1, F2, F3, §1.3) está sin aplicar |
+| 1.3a | Aplicar el plan de fixes del verificador (F1, F2, F3) | `[x]` | §1.3a — cuatro commits, 370 líneas, verificado dos veces, review nativa `approved` y quemada |
+| 1.4 | Cierre | `[x]` | §1.4 — README, espejo y status coinciden con lo que existe |
 
 La tarea 1.3 está `[x]` porque la verificación que pide *corrió* y sus refutaciones están registradas;
-no es una afirmación de que la feature esté sana. Lo que refutó es la razón por la que 1.4 sigue
-abierta.
+no es una afirmación de que la feature esté sana. Lo que refutó es exactamente lo que la tarea 1.3a
+después aplicó.
 
 ## Registro de evidencia
 
@@ -313,6 +349,178 @@ aplicar:
   offset de `+24:00` — para que la paridad se mida sobre el **dominio** y no sobre la muestra.
 - **F3**: reducir el scan a tokens específicos de Redis e incluir los dos módulos de validadores.
 
+### 1.3a — el plan de fixes aplicado, verificado dos veces y revisado (2026-09-18)
+
+Cuatro commits de unidad de trabajo en `feat/wu3-contract-fixes`, todos **locales y sin pushear**:
+`516ca56` (el tracking de esta tarea), `608c375` (F1, F2, F3), `66ec44f` (los tres hallazgos de la
+primera ronda de verificación) y `f598a30` (la gramática del offset). **370 líneas autoradas** — 330
+adiciones, 40 deleciones, 14 archivos — dentro del presupuesto de 400 líneas que este repositorio se
+puso.
+
+**Los tres fixes, cada uno probado por mutación y no por reporte.**
+
+- **F1.** Las dos suites ahora leen `contracts/dispatch-envelope.schema.json` del disco y afirman su
+semántica. Cuatro mutaciones del schema, de a una por vez, cada una haciendo fallar **las dos** suites
+y cada una revertida después: `additionalProperties: true`; el `const` de versión a `...v2`; `format:
+  date-time` a `date`; una cuarta propiedad agregada. Las aserciones nacen verdes por diseño —el
+archivo ya era correcto—, así que la mutación *es* el RED.
+- **F2.** Los cuatro documentos que el lado de Python aceptaba mientras zod los rechazaba se agregaron
+como fixtures **primero**, y la compuerta de Python falló exactamente en esos cuatro mientras la de
+TypeScript seguía verde: el defecto de paridad mismo, observado y no argumentado. `occurred_at` ahora
+son dos compuertas —el regex pinnea la gramática, `datetime.fromisoformat` aporta el calendario y el
+rango de offset— y el orden importa: al revés, `fromisoformat` solo aceptaría `+0000`, un offset sin
+dos puntos.
+- **F3.** El scan de vocabulario nombra sólo maquinaria de Redis (`xadd`, `xreadgroup`, `xack`,
+`xautoclaim`, `xgroup`, `xautoclave`, `group`, `stream`, `delivery_count`, `redis`), liberando
+`consumer` —la propia palabra de la especificación para los dos runtimes— y ahora cubre los dos
+validadores de zod y los modelos de pydantic. Tokens plantados en los tres módulos de validadores
+hacen fallar las dos suites.
+
+**La verificación independiente refutó el primer intento, y la refutación era correcta.** La compuerta
+de calendario había *creado* una divergencia: `0000-09-17T12:00:00Z` era aceptado por zod y rechazado
+por pydantic, cuando antes de esta tarea **ambos** lo aceptaban. Dos hallazgos más: los *tipos* de las
+propiedades del schema seguían sin afirmarse (`properties.job_id.type: "number"` pasaba las dos
+suites), y acotar el scan había liberado `stream` y `group`, que C3 prohíbe por nombre. Los tres se
+cerraron en `66ec44f`:
+
+- el dominio de instante queda declarado como **años 0001–9999** y aplicado en los dos runtimes: un
+  `pattern` de `^(?!0000)` en el schema —una comprobación negativa de prefijo, deliberadamente no una
+  cuarta copia de la gramática, que no podría chequear el calendario y se leería como la definición
+  del campo—, un `.refine` explícito en el validador de zod, y la compuerta de calendario de Python que
+  ya existía. Medido por fixture: `year-zero-occurred-at.json` lo rechazan los dos, con Python
+  rechazándolo en la compuerta 2, y `boundary-min-year.json` / `boundary-max-year.json` pinnean el otro
+  borde para que el acotamiento no se convierta en silencio en "sólo fechas modernas";
+- los dos tipos de propiedad quedan afirmados, cada uno probado haciendo fallar las dos suites por
+  mutación;
+- `stream`, `group` y `xautoclave` vuelven a la lista, y sólo se liberó `consumer`.
+
+**Un cuarto defecto, pre-existente, encontrado al revisar ese fix.** `datetime.fromisoformat`
+*normaliza* los componentes de un offset en vez de chequear su rango: `+02:60` pasaba a `+03:00` y
+`+02:99` a `+03:39`, mientras zod rechazaba ambos — o sea que el worker de Python habría procesado un
+envelope que el productor nunca podría emitir. La compuerta de gramática ahora pinnea el offset a la
+gramática de RFC 3339, `[+-](?:[01]\d|2[0-3]):[0-5]\d`, y
+`offset-minutes-out-of-range-occurred-at.json` lo mide. Una matriz de 30 documentos devolvió veredictos
+idénticos del validador de zod real y del parser de Python real. Este defecto es anterior al plan de
+fixes: el regex original tenía el mismo `[+-]\d{2}:\d{2}` permisivo.
+
+**La segunda ronda de verificación: `holds`.** Un reticulado exhaustivo de **6060 documentos** —cada
+offset `[+-]HH:MM` para horas 00–26 y minutos 00–99, más barridos de hora/minuto/segundo, mes, día a lo
+largo de los doce meses y de febrero en un año bisiesto y uno no bisiesto, los bordes de año
+(`0000–0002`, `1899–1901`, `1999–2001`, `9998–9999`, uno por encima del rango de cuatro dígitos) y los
+bordes léxicos (`T`/`t`/espacio, `Z`/`z`, sólo fecha, sin offset, `+0000`, de cero a diez dígitos
+fraccionarios, un punto final, formas de segundo intercalar)— produjo **cero divergencias** entre los
+dos runtimes, y cada veredicto además coincidió con un modelo de expectativa independiente. Dos trampas
+de medición se cazaron en el proceso y vale conservarlas: `z.string().datetime()` solo *no* es el
+validador de TypeScript (la exclusión del año 0000 vive en un `.refine`), y `wc -l` cuenta
+terminadores mientras `grep -c ''` cuenta ítems.
+
+R1–R3 de §1.3 quedan **cerradas**; R4 (el `quality` duplicado por construcción) sigue siendo la
+duplicación aceptada y policiada que se registró.
+
+**Una reescritura sólo del mensaje, registrada porque afecta cómo se puede citar este documento.**
+`f8b918c` y `a14ed38` se reescribieron a `66ec44f` y `f598a30` para corregir una cláusula inexacta en
+el mensaje de un commit. Los trees son idénticos (`0d8c3cf…` y `e7511d70…`) y el digest del patch del
+rango no cambia (`fd1026535d86ac61…`, 599 líneas), así que la verificación aplica al contenido que
+queda. Los commits reemplazados son inalcanzables y tarde o temprano se podan, así que **este documento
+cita los commits vivos más la igualdad de trees**, nunca los muertos.
+
+**Gates.** `pnpm --filter api exec vitest run test/contract.parity.spec.ts` → **19 passed**;
+`uv run --project workers/media pytest workers/media/tests/test_contract_parity.py -q` → **20
+passed**; `uvx --from ruff==0.16.8 ruff check workers/media` → limpio. La compuerta de TypeScript corre
+por el toolchain de Windows (`cmd.exe /c …`), porque `node_modules` en este árbol de trabajo es una
+instalación de Windows y vitest no arranca desde la shell de WSL. `apps/api/test/schema.spec.ts`,
+`apps/api/test/harness.spec.ts` y `workers/media/tests/test_db_privileges.py` fallan localmente por
+falta de PostgreSQL —no hay daemon de Docker en esta distro— y están verdes en CI; esta tarea no los
+tocó.
+
+**La review nativa: `approved`, y después quemada.** Linaje `review-8e2cde82d8c27d94`, riesgo
+**medium**, una lente consolidada (`review-reliability`), 14 archivos cambiados, 370 líneas,
+presupuesto de corrección 185. El acknowledgement consumió la revisión `sha256:d83fea73…` con
+`authority: burned` y `burn_evidence: gentle-ai.review-acknowledged/v1`. Dos hallazgos **advisory**,
+los dos `SUGGESTION` / `informational`, ninguno abre una corrección y ninguno es razón para volver a
+correr la review: `R3-001` en `workers/media/src/mediaforge/contracts.py:94-95` y `R3-002` en
+`:103-108` — en la revisión revisada, ésos son el bloque de comentario de la compuerta 2 y la
+comprobación de calendario `try`/`except`. Quedan registrados acá como trabajo de seguimiento.
+
+**La review corrió sobre una presentación staged del mismo contenido, y eso no es un tecnicismo.** Con
+el árbol limpio, la ruta de rango commiteado no podía arrancar (bloqueo 3 abajo), así que los cuatro
+commits quedaron intactos en `feat/wu3-contract-fixes` y el conjunto de cambios idéntico se presentó al
+provider como **cambios staged sobre `origin/main`** en una rama temporal. El `sha256` del índice no
+cambió, el diff staged fue exactamente `git diff 0bb898a f598a30` (14 archivos, 330/40), y el árbol
+candidato que el provider congeló fue `e7511d70…` — el mismo tree que `f598a30`. El resultado
+`delivery` de la review es `ordinary-repository-policy`: no se pusheó nada y no se mergeó nada.
+
+**La compuerta del propio RDD, para el registro.** `assess` devolvió `risk: unassessable` con
+`native-assess-unavailable` (una respuesta nativa incompatible de schema), `rddLine: on`, y un plan que
+exige un verificador independiente separado además de la autoverificación del writer — que es lo que
+es la segunda ronda de §1.3. Esa evaluación nunca mutó autoridad de review.
+
+**Cuatro bloqueos de entorno, registrados porque no son culpa del candidato.** Cada uno se midió, y
+cada uno fue un stop duro hasta que se arregló el entorno:
+
+1. **El montaje no podía almacenar modos POSIX.** `/mnt/c` está montado como 9p/DrvFs sin `metadata`,
+   así que todo se leía como `0777` y `chmod` era un no-op. El candidate view de la review exige
+   `(mode & 0o077) == 0`, que ese montaje no puede satisfacer — medido contra un filesystem nativo,
+   `mkdirSync(mode 0o700)` daba `777` en `/mnt/c` y `700` allá. Lo arregló el supervisor:
+   `[automount] options = "metadata"` en `/etc/wsl.conf`, un reinicio de WSL, y un `chmod 700` sobre
+   el directorio compartido `candidate-views`. No se borró nada.
+2. **git 2.34.1 es demasiado viejo.** El builder del candidate view llama a
+   `git worktree list --porcelain -z`; 2.34.1 responde `unknown switch 'z'` (exit 129), y la facade lo
+   reporta como un fallo del candidate view. Se arregló instalando git 2.55.0 del PPA `git-core/ppa`.
+3. **La ruta de rango commiteado no está cableada en gentle-pi 3.2.1.** `start` con `baseRef` +
+   `committedOnly` terminaba siempre en `schema-incompatible`: la facade vuelve a correr el STATUS
+   nativo con `--projection workspace`, y con el árbol limpio ese candidato es vacío *por
+   construcción*, así que el STATUS responde `collect` / `empty_candidate_base_ref_required` y no
+   existe ninguna transición `start` ejecutable. El schema del input no expone `projection`, y el
+   `--projection staged` del propio nativo nunca se pasa. Se resolvió con la presentación staged
+   descrita arriba.
+4. **Los assets gestionados estaban viejos.** El stop `managed_assets_outdated` prescribía el sync del
+   propio binario pinneado 3.2.1; reportó "All managed assets are already up to date. No files
+   changed" y sólo reescribió el digest registrado (`944fa704…` → `61ae1c61…`). La causa de fondo es
+   una desalineación de versiones: el `gentle-ai` global es 3.3.0 mientras el paquete de Pi pinnea
+   3.2.1.
+
+### 1.4 — Cierre (2026-09-18)
+
+Se cierra la feature con los cuatro puntos de la aceptación verificados por medición, no por lectura:
+
+- **`contracts/README.md` coincide con lo que existe.** Su fila del schema ahora nombra el dominio de
+años (`pattern: "^(?!0000)"`), y sus dos filas de fixtures de envelopes nombran los casos que existen
+hoy: los de calendario (fecha imposible, mes inválido, 29 de febrero de año no bisiesto), el offset
+fuera de rango, el de minutos fuera de rango, el año 0000, y los dos bordes de año en `valid/`. El
+párrafo de broker-agnosticismo dejó de decir "el schema, el registry y cada fixture": ahora incluye los
+dos validadores de zod y los modelos de pydantic, nombra los diez tokens de Redis y dice por qué
+`consumer` no está en la lista.
+- **El espejo `.es.md` está regenerado y sus bloques de código son idénticos byte a byte** al inglés
+  canónico. La comprobación extrae cada bloque cercado de los dos archivos y los compara de a pares:
+
+```text
+$ python3 - <<'PY'
+import pathlib, re
+fence = '`' * 3
+pattern = rf'^{fence}[^\n]*\n(.*?)^{fence}$'
+blocks = lambda p: re.findall(pattern, pathlib.Path(p).read_text('utf-8'), flags=re.M | re.S)
+en = blocks('odd/tasks/wu3-contract.md')
+es = blocks('odd/tasks/wu3-contract.es.md')
+print(len(en), len(es), all(a == b for a, b in zip(en, es)))
+PY
+5 5 True
+```
+- **Las gates quedan registradas** en §1.3a con sus números, y se volvieron a correr en el cierre sobre
+el mismo contenido: el tree de `f598a30` sigue siendo `e7511d70…` y el digest del patch del work unit
+sigue siendo `fd1026535d86ac61…`, o sea que lo verificado es lo que está.
+- **La review nativa quedó cerrada sobre este candidato**: `approved` y quemada (linaje
+`review-8e2cde82d8c27d94`), con sus dos hallazgos advisory registrados como seguimiento en §1.3a.
+
+**Sobre exactamente qué cubrió la review.** El candidato que el provider congeló fue el tree
+`e7511d70…` — el mismo tree que `f598a30` — a lo largo de 14 paths, e incluía este documento. Los
+commits del cierre son sólo documentación, y la review está cerrada con su autoridad quemada: nada de
+acá la reabre. Coherente con el precedente de este repositorio para features de documentación, este
+cierre no se manda a review nativa por sí solo.
+
+**Entrega**: `delivery: ordinary-repository-policy`. Los cuatro commits de unidad de trabajo están
+locales, la rama no tiene upstream, y push, pull request y merge quedan como decisión del supervisor.
+
 ## Fuera de alcance
 
 - Los loaders del registry y cualquier código que *use* el registry para validar una submission
@@ -326,12 +534,12 @@ aplicar:
 
 ## Next step
 
-Aplicar el plan de fixes del verificador registrado en §1.3 antes de cerrar — **F1** (afirmar la
-semántica del schema en las dos suites: `additionalProperties: false`, el `const` de versión,
-`format: date-time`, exactamente tres propiedades), **F2** (validación de fecha con conocimiento de
-calendario del lado de Python en lugar del regex, más los cuatro fixtures faltantes: fecha imposible,
-mes inválido, un 29 de febrero de año no bisiesto y un offset de `+24:00`) y **F3** (reducir el scan de
-vocabulario a tokens específicos de Redis e incluir los dos módulos de validadores). La tarea 1.4 queda
-`[ ]` hasta que eso aterrice. Medido el 2026-09-17: F2 no está aplicado — los cuatro fixtures están
-ausentes de `contracts/fixtures/envelopes/invalid/` y `workers/media/src/mediaforge/contracts.py` no
-contiene `datetime`, `date(` ni `fromisoformat`.
+La tarea 1.4 — el Cierre — es la única tarea abierta que queda. §1.3a aplicó el plan de fixes del
+verificador (F1, F2, F3) de §1.3, cerró los tres hallazgos de la primera ronda de verificación y el
+defecto de offset pre-existente encontrado al revisarla, y su review nativa está `approved` y quemada.
+El cierre significa que `contracts/README.md` y este documento coinciden con lo que existe —incluido el
+scan, que ahora cubre los dos módulos de validadores—, que el espejo `.es.md` está regenerado y
+verificado byte a byte en sus bloques de código, y que las gates quedan registradas. La entrega —push,
+pull request, merge— sigue siendo decisión del supervisor bajo la política ordinaria del repositorio:
+los cuatro commits son locales, la rama no tiene upstream, y el propio resultado `delivery` de la review
+es `ordinary-repository-policy`.

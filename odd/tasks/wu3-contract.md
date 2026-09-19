@@ -6,7 +6,10 @@
 **Workflow:** Organic Driven Development (ODD).
 **Requirements source of truth:** `openspec/changes/audio-extract-vertical-slice/` — read-only unless
 the supervisor asks for a correction.
-**Status:** `in progress` — created 2026-09-17.
+**Status:** `closed` 2026-09-18 — tasks 1.1 to 1.4 complete. §1.3a applied the verifier's fix plan,
+the work unit was verified twice (the second round `holds` over 6060 documents) and its native
+review is `approved` and burned. Delivery — push, pull request, merge — remains the supervisor's
+decision under ordinary repository policy.
 
 ---
 
@@ -188,7 +191,7 @@ outcome per work unit live in the evidence log, where they were recorded as the 
 | 1.2 | GREEN: the contract, the registry, the fixtures and the two validators | `[x]` | §1.2 |
 | 1.3 | RDD conformance, per work unit | `[x]` | §1.3 |
 | 1.3a | Apply the verifier's fix plan (F1, F2, F3) | `[x]` | §1.3a — four commits, 370 lines, verified twice, native review `approved` and burned |
-| 1.4 | Closure | `[ ]` | — the last open task now that §1.3a is applied and its review is closed |
+| 1.4 | Closure | `[x]` | §1.4 — README, mirror and status agree with what exists |
 
 Task 1.3 is `[x]` because the verification it asks for *ran* and its refutations are recorded; it is
 not a statement that the feature is sound. What it refuted is exactly what task 1.3a then applied.
@@ -459,6 +462,47 @@ is never passed. Resolved by the staged presentation described above.
 binary's own sync; it reported "All managed assets are already up to date. No files changed" and
 only rewrote the recorded digest (`944fa704…` → `61ae1c61…`). The root cause is a version skew: the
 global `gentle-ai` is 3.3.0 while the Pi package pins 3.2.1.
+
+### 1.4 — Closure (2026-09-18)
+
+The feature closes with its four acceptance points verified by measurement rather than by reading:
+
+- **`contracts/README.md` agrees with what exists.** Its schema row now names the year domain
+  (`pattern: "^(?!0000)"`); its two envelope-fixture rows name the cases that are actually there —
+  the calendar ones (impossible date, invalid month, non-leap February 29th), the out-of-range
+  offset, the out-of-range offset *minutes*, year zero, and the two year boundaries under `valid/`.
+  Its broker-agnostic paragraph no longer says "the schema, the registry and every fixture": it now
+  includes both zod validators and the pydantic models, names the ten Redis tokens, and says why
+  `consumer` is not among them.
+- **The `.es.md` mirror is regenerated and its code blocks are byte-identical** to the canonical
+  English. The check extracts every fenced block of both files and compares them pairwise:
+
+```text
+$ python3 - <<'PY'
+import pathlib, re
+fence = '`' * 3
+pattern = rf'^{fence}[^\n]*\n(.*?)^{fence}$'
+blocks = lambda p: re.findall(pattern, pathlib.Path(p).read_text('utf-8'), flags=re.M | re.S)
+en = blocks('odd/tasks/wu3-contract.md')
+es = blocks('odd/tasks/wu3-contract.es.md')
+print(len(en), len(es), all(a == b for a, b in zip(en, es)))
+PY
+5 5 True
+```
+- **The gates are recorded** in §1.3a with their numbers, and they were re-run at closure on the same
+  content: `f598a30`'s tree is still `e7511d70…` and the work unit's patch digest is still
+  `fd1026535d86ac61…`, so what was verified is what stands.
+- **The native review is closed on this candidate**: `approved`, then burned (lineage
+  `review-8e2cde82d8c27d94`), with its two advisory findings recorded as follow-ups in §1.3a.
+
+**On exactly what the review covered.** The candidate the provider froze was the tree `e7511d70…` —
+the same tree as `f598a30` — across 14 paths, and it included this document. The closure commits that
+follow are documentation only, and the review is closed with its authority burned: nothing here
+re-opens it. Consistent with this repository's precedent for documentation features, this closure is
+not sent to native review on its own.
+
+**Delivery**: `delivery: ordinary-repository-policy`. The four work-unit commits are local, the branch
+has no upstream, and push, pull request and merge remain the supervisor's decision.
 
 ## Out of scope
 
