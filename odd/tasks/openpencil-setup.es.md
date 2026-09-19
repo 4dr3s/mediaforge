@@ -136,8 +136,8 @@ trampa, no un cinturón y tirantes.
 - **Estrategia:** `single-pr`. Una unidad de trabajo, una rama, apilada sobre `docs/frontend-style-decision`
   porque esta feature implementa ese ADR y lo cita por archivo; la base del PR es esa rama, así un revisor ve
   la instalación y no el documento de decisión otra vez.
-- **Pronóstico:** los archivos de repositorio son `942` líneas autoradas en el par de
-  documentos (`472` en inglés, `470` en español) — el espejo español es `49.9%`
+- **Pronóstico:** los archivos de repositorio son `964` líneas autoradas en el par de
+  documentos (`483` en inglés, `481` en español) — el espejo español es `49.9%`
   del costo, que es la constante medida de este repositorio por quinta feature consecutiva. La instalación en sí
   no aporta líneas de repositorio; cambia la máquina.
 - **Fronteras de slice:** ninguna. Hay un archivo de configuración, un directorio y un par de documentos.
@@ -438,6 +438,17 @@ Se instalaron tres symlinks en `~/.pi/agent/bin` (`openpencil`, `openpencil-mcp`
 un cambio de máquina, fuera del repositorio, y reversible borrándolos. Se usa el directorio bin propio de Pi
 a propósito, porque ya está primero en el PATH de todo proceso de Pi, así que la configuración commiteada no
 necesita editar perfiles en ninguna máquina que tenga los paquetes instalados.
+
+**Cómo falla este arreglo, medido y no supuesto.** Los tres symlinks tienen dos saltos —
+`~/.pi/agent/bin/openpencil-mcp` → `~/.bun/bin/openpencil-mcp` →
+`~/.bun/install/global/node_modules/@open-pencil/mcp/dist/stdio.mjs` — así que dependen de que la
+instalación global de bun sobreviva. Verificado hoy: tres enlaces, ninguno roto (`find ~/.pi/agent/bin
+-xtype l` no devuelve nada). Si alguna vez se limpia `~/.bun`, el modo de falla **cambia** en vez de
+desaparecer: un comando ausente responde `command not found`, mientras que un enlace roto responde
+`No such file or directory`. Misma causa, síntoma distinto, y el segundo apunta a un archivo en vez de a un
+PATH — conviene reconocerlo antes de debuggearlo. La sesión par que lo reportó lo encontró revisando cómo
+sus propios respaldos registraban symlinks, y midió que `find -type f` ve **1 de las 4 entradas** de ese
+directorio: un snapshot tomado así puede omitir los symlinks por completo y aun así reportar éxito.
 
 **Qué tienen en común los dos defectos, que es la lección real.** §1.3 testeó el servidor invocándolo
 directamente; §1.7 es el mismo servidor fallando en una capa que nadie invocó. Todos los chequeos de este

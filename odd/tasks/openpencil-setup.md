@@ -137,8 +137,8 @@ belt-and-braces.
 - **Strategy:** `single-pr`. One work unit, one branch, stacked on `docs/frontend-style-decision`
   because this feature implements that ADR and cites it by file; the PR base is that branch, so a
   reviewer sees the install and not the decision document again.
-- **Forecast:** the repository files are `942` authored lines across the document pair
-  (`472` English, `470` Spanish) — the Spanish mirror is `49.9%` of the
+- **Forecast:** the repository files are `964` authored lines across the document pair
+  (`483` English, `481` Spanish) — the Spanish mirror is `49.9%` of the
   cost, which is this repository's measured constant for a fifth consecutive feature. The install
   itself contributes no repository lines; it changes the machine.
 - **Slice boundaries:** none. There is one config file, one directory and one document pair.
@@ -441,6 +441,17 @@ Three symlinks were installed in `~/.pi/agent/bin` (`openpencil`, `openpencil-mc
 a machine change, outside the repository, and reversible by deleting them. Pi's own bin directory is used
 deliberately because it is already first on PATH for every Pi process, so the committed configuration needs
 no profile edit on any machine that has the packages installed.
+
+**How this fix fails, measured rather than assumed.** The three symlinks are two hops deep —
+`~/.pi/agent/bin/openpencil-mcp` → `~/.bun/bin/openpencil-mcp` →
+`~/.bun/install/global/node_modules/@open-pencil/mcp/dist/stdio.mjs` — so they depend on the global bun
+install surviving. Verified today: three links, none dangling (`find ~/.pi/agent/bin -xtype l` is empty).
+If `~/.bun` is ever cleaned, the failure mode *changes* rather than disappears: a missing command answers
+`command not found`, while a dangling link answers `No such file or directory`. Same cause, different
+symptom, and the second one points at a file instead of at a PATH — worth recognising before debugging it.
+The peer session that reported it found it while checking how its own backups recorded symlinks, and
+measured that `find -type f` sees **1 of the 4 entries** in that directory: a snapshot taken that way can
+omit the symlinks entirely and still report success.
 
 **What the two defects have in common, which is the actual lesson.** §1.3 tested the server by invoking it
 directly; §1.7 is the same server failing at a layer nobody invoked. Every check in this document was a
