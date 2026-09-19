@@ -80,7 +80,7 @@ También se midieron tres cosas de la máquina, y cada una contradice `openspec/
 | --- | --- |
 | `node v25.2.1` | **v25.9.0** |
 | `bun 1.3.14` | **ningún bun en absoluto** en WSL — `~/.bun/bin` existía y estaba vacío; solo `bun.exe` del lado Windows |
-| Docker CLI 29.6.2, daemon corriendo | **`docker` no está presente** en esta distro de WSL |
+| Docker CLI 29.6.2, daemon corriendo | **`docker` sí resuelve**, al binario de Windows (`/mnt/c/Program Files/Docker/Docker/resources/bin/docker`), pero el **daemon no responde** (`npipe:////./pipe/dockerDesktopLinuxEngine`). Esta fila decía "no presente" hasta el 2026-09-19 y eso era **falso**: el aviso de integración de Docker Desktop no es un binario ausente |
 
 ## La configuración, y por qué se commitea
 

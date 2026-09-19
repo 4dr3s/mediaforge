@@ -79,7 +79,7 @@ Three things about the machine were also measured, and each contradicts `openspe
 | --- | --- |
 | `node v25.2.1` | **v25.9.0** |
 | `bun 1.3.14` | **no bun at all** in WSL — `~/.bun/bin` existed and was empty; only `bun.exe` on the Windows side |
-| Docker CLI 29.6.2, daemon running | **`docker` is not present** in this WSL distro |
+| Docker CLI 29.6.2, daemon running | **`docker` resolves** to the Windows binary (`/mnt/c/Program Files/Docker/Docker/resources/bin/docker`), but the **daemon is unreachable** (`npipe:////./pipe/dockerDesktopLinuxEngine`). This row said "not present" until 2026-09-19 and that was **wrong**: Docker Desktop's WSL-integration notice is not an absent binary |
 
 ## The configuration, and why it is committed
 
