@@ -8,9 +8,10 @@
 **Requirements source of truth:** the supervisor's four decisions of 2026-09-19, recorded verbatim in
 *Decisions taken with the supervisor* below, plus the tool facts measured in §1.1 of the evidence log.
 `openspec/changes/audio-extract-vertical-slice/` is untouched by this feature and stays untouched.
-**Status:** `in progress` — created 2026-09-19. Tasks 1.1–1.5 are evidenced; the feature is not
-declared `closed`, because what it defers (installing the tool, wiring the MCP, writing the style
-skill) are separate features with their own runtime acceptance, not residues of this one.
+**Status:** `closed` for its own five tasks — created 2026-09-19 and closed the same day, work unit
+`0b8e434` on `docs/frontend-style-decision`. The three deferred items (installing the tool, wiring the
+MCP entry, writing the style skill) are **separate features, not residues**: each carries a runtime
+acceptance that a Markdown task cannot claim.
 
 ---
 
@@ -209,24 +210,26 @@ commit existed.
 
 - **Strategy:** `single-pr`. One document pair, one work unit, no dependency on any other branch.
 - **Forecast, corrected in place:** the forecast was **under 400 authored lines for the pair**. Measured:
-  **1048** authored lines (`frontend-style.md` 513, `frontend-style.es.md`
-  535), additions only — both files are new, so each contributes its line count and zero
-  deletions. The forecast was wrong by a factor of 2.6 and is kept visible here rather than
+  **1136** authored lines (`frontend-style.md` 556, `frontend-style.es.md`
+  580), additions only — both files are new, so each contributes its line count and zero
+  deletions. The forecast was wrong by a factor of 2.8 and is kept visible here rather than
   overwritten, which is the rule this bullet set for itself when it was wrong.
-- **The mirror is 51.0% of the cost** — 535 of 1048 lines. That
+- **The mirror is 51.1% of the cost** — 580 of 1136 lines. That
   reproduces the constant `odd-doc-structure` §1.1 measured across four features (the mirror at ~49–51%
   of every pair), which is now five features and the same constant. It is the delivery cost no document
   in this repository had counted before that feature, and it is why a 400-line budget and a 400-line
   *document* are not the same thing.
-- **The budget is exceeded, and that is reported rather than argued away.** At 1048 lines the
-  pair sits at 2.62× the 400-line advisory budget. Nothing here is padded and nothing will be
+- **The budget is exceeded, and that is reported rather than argued away.** At 1136 lines the
+  pair sits at 2.84× the 400-line advisory budget. Nothing here is padded and nothing will be
   shrunk to reach 400: the two files are one decision document and its required study copy, and cutting
   either to fit the number would delete the decision or the mirror rule. The honest reading is that the
   400-line budget is a *review* unit for code, and that this repository's mirror convention has been
   pushing documentation pairs past it since the first feature — the measurement is the finding, not the
   failure.
 - **Slice boundaries:** none, because none are needed. The work is one document pair; there is nothing
-  to stack.
+  to stack. It landed as **one work unit, `0b8e434`**, one commit ahead of `origin/main`, and the closure
+  record in §1.5 is the immediately following commit on the same branch — which is why the closure entry's
+  own commit is not named anywhere: it cannot be. Two commits, one branch, no stack.
 - **Not delivered by this feature:** the installation of the tool, the harness MCP entry, any style
   value, and the Next.js scaffold. See *Out of scope*.
 
@@ -288,10 +291,11 @@ State is `[x]` only where the evidence log holds observed proof for that task.
 | 1.2 | Decision and consequences, English canonical | `[x]` | §1.2 |
 | 1.3 | Spanish mirror, blocks byte-identical | `[x]` | §1.3 |
 | 1.4 | Verification, mechanical and recorded | `[x]` | §1.4 |
-| 1.5 | Closure | `[ ]` | — |
+| 1.5 | Closure | `[x]` | §1.5 |
 
-Task 1.5 is `[ ]` with its reason stated: closure cannot be evidenced while the work unit has no commit,
-and this feature does not commit without the supervisor's explicit instruction.
+Task 1.5 is `[x]` because the work unit it was waiting on exists: `0b8e434`. The closure entry in §1.5
+records the commit, and records honestly that its own commit is necessarily outside the range it
+describes — this entry cannot name the commit that contains it.
 
 ## Evidence log
 
@@ -404,11 +408,16 @@ value written in prose leaves the fenced content — and therefore the hash — 
 Measured, in this order:
 
 - **Counter-example, on the modified copy:** the counter run's hash **differs** from the English run's
-  hash (`e0312115ea3771cdcb8f198d7bf4344d` against `a4adcb9cc995449ba4f5392b98a908b1`). That divergence is the only property that matters
+  hash (`b8c2c8d9c848e5a00877ad81cf23df17` against `3f3ddd21d28c3ac9ad7c0f9851e114ee`). That divergence is the only property that matters
   here: a check whose failure mode has never been observed is not yet a check (defect D1).
-- **English, the real run:** `a4adcb9cc995449ba4f5392b98a908b1`
-- **Spanish mirror, the real run:** `a4adcb9cc995449ba4f5392b98a908b1` — identical to the English, or the mirror is wrong
+- **English, the real run:** `3f3ddd21d28c3ac9ad7c0f9851e114ee`
+- **Spanish mirror, the real run:** `3f3ddd21d28c3ac9ad7c0f9851e114ee` — identical to the English, or the mirror is wrong
   and this feature is not done.
+
+**This value moved once, and the old one stays visible.** Before the closure entry in §1.5 added its own
+fenced block, the pair hashed `a4adcb9cc995449ba4f5392b98a908b1`. Adding a block changes the content the
+hash covers, so the figure above is the value at `HEAD` and the earlier one is recorded here rather than
+overwritten — the same rule the *Delivery* forecast follows.
 
 #### 1.4b — the checks
 
@@ -417,8 +426,8 @@ $ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
     printf '%s: ## headings=%s, fenced blocks=%s\n' "$f" \
       "$(grep -c '^## ' $f)" "$(( $(grep -c '^```' $f) / 2 ))"
   done
-odd/tasks/frontend-style.md: ## headings=14, fenced blocks=4
-odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=4
+odd/tasks/frontend-style.md: ## headings=14, fenced blocks=5
+odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=5
 
 $ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
     printf '%s -> ' "$(basename $f)"
@@ -438,43 +447,79 @@ frontend-style.md: §1.1 OK
 frontend-style.md: §1.2 OK
 frontend-style.md: §1.3 OK
 frontend-style.md: §1.4 OK
+frontend-style.md: §1.5 OK
 frontend-style.es.md: §1.1 OK
 frontend-style.es.md: §1.2 OK
 frontend-style.es.md: §1.3 OK
 frontend-style.es.md: §1.4 OK
+frontend-style.es.md: §1.5 OK
 
 $ printf 'open Progress state rows marked [ ]: %s (EN), %s (ES)\n' \
     "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.md | wc -l)" \
     "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.es.md | wc -l)"
-open Progress state rows marked [ ]: 1 (EN), 1 (ES)
+open Progress state rows marked [ ]: 0 (EN), 0 (ES)
 
 $ git status --short
-?? odd/tasks/frontend-style.es.md
-?? odd/tasks/frontend-style.md
+ M odd/tasks/frontend-style.es.md
+ M odd/tasks/frontend-style.md
 ```
 
 The field headings are listed without line numbers on purpose: the block that carries this output
 also moves those numbers, so an absolute line number recorded here would be stale in the same
 authoring pass that wrote it. Order and verbatim text are what the check is for, and both are stable.
-The `[x]` scan resolves every marked row against a `### <id>` heading in the same document; the one
-`[ ]` state row is task 1.5, and its reason is stated — which is what the acceptance criterion
-requires, not a blanket ban on an open task.
+The `[x]` scan resolves every marked row against a `### <id>` heading in the same document — five rows,
+five resolutions, per file.
+
+**One acceptance criterion now passes vacuously, and that is recorded rather than counted as a pass.**
+Task 1.4 demands that every `[ ]` carry a stated reason. With the closure entry in §1.5, this document has
+**zero** open state rows, so there is nothing for that criterion to check: it cannot fail here any more
+than it could have before, and it proves nothing either way. It is the same category as this repository's
+recorded defect D1 — a gate over an empty set is not a gate — and it is noted instead of being reported as
+a green check. The criterion stays in the task text because a reopened task would need it again.
 
 The authored-line measurement lives in *Delivery* and below, in prose, for the same reason the hashes
 do: a number written inside a fenced block is part of the content that block's hash covers, and this
 document's own size is what is being measured.
 
-**Authored lines, this work unit:** 1048 total — 513 in `frontend-style.md`
-and 535 in `frontend-style.es.md`, additions only, since both files are new and therefore
+**Authored lines, this work unit:** 1136 total — 556 in `frontend-style.md`
+and 580 in `frontend-style.es.md`, additions only, since both files are new and therefore
 contribute zero deletions. Measured with `wc -l` against the working tree, after every other edit in this
 pass; the substitution that wrote these numbers replaced tokens in place, so it changed neither the line
 count nor the fenced content the hash above covers. That is the reason the numbers can be exact here
 while a figure inside a fenced block could not be.
 
-### 1.5 — closure (pending)
+### 1.5 — closure (2026-09-19)
 
-No entry. Task 1.5 is `[ ]`: the work unit is uncommitted, and this feature commits only on the
-supervisor's explicit instruction.
+The work unit exists. Raw output, unedited:
+
+```text
+$ git show --stat --format="" HEAD
+ odd/tasks/frontend-style.es.md | 535 +++++++++++++++++++++++++++++++++++++++++
+ odd/tasks/frontend-style.md    | 513 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 1048 insertions(+)
+
+$ git rev-list --count origin/main..HEAD
+1
+
+$ git log -1 --format="%H %s"
+0b8e43461c400e5b3af5e0b320675cb876271c5c docs(odd): record the frontend mockup tool and the style source of truth
+```
+
+The figure `1048` in that block is the commit's own statistics, and it is **frozen there on purpose**:
+because §1.4b declares that this document's authored-line count moves with every edit to it, a document
+that cited its current size inside a commit transcript would be citing a number the transcript itself
+invalidates. The commit's count is history; the current count is stated in §1.4b, in prose, and updated
+in the pass that makes it true.
+
+**What the closure does not claim.** The commit above is the deliverable. The commit that *contains this
+entry* is necessarily outside the range it describes, so it is not named — naming it would require
+knowing a hash before writing the file that computes it. This is the same boundary `odd-doc-structure`
+recorded for its slice 1.7, and it is stated rather than hidden.
+
+**What remains open, and is not residual work.** The three deferred items in *Out of scope* — install,
+harness entry, style skill — are the *Next step*, and they are separate features on purpose: two of them
+have runtime acceptance criteria (the CLI answers `openpencil --help`; the MCP server answers a real
+client call with `OPENPENCIL_MCP_ROOT` confined) that no Markdown task can satisfy or evidence.
 
 ## Out of scope
 
@@ -501,13 +546,11 @@ supervisor's explicit instruction.
 
 ## Next step
 
-The decision is recorded and the deferred work is named. Two actions belong to the supervisor, and
-neither is taken here:
+This feature is closed. Two actions belong to the supervisor, and neither is taken here:
 
-1. **Branch and commit for this document pair.** The work was written on the checked-out branch
-   `feat/wu3-contract-fixes`, which is `origin/main` plus two commits of an unrelated work unit
-   (`516ca56`, `608c375`). A `docs/*` branch cut from `origin/main` keeps the two apart; committing here
-   would put a frontend decision inside a contract-fix PR. No commit is made without the instruction.
+1. **Push and open the PR** for `docs/frontend-style-decision`. The branch carries one work unit plus the
+   closure commit; it matches the CI policy's branch pattern, and the PR needs exactly one `type:*` label
+   (`type:docs`). Pushing is a delivery act, not a review act, and it is the supervisor's call.
 2. **Which deferred feature comes next** — installing the tool and wiring the confined MCP entry, or
-   writing the project-local style skill. They are independent, and the first has a runtime acceptance
-   the second does not.
+   writing the project-local style skill. They are independent, and the first carries a runtime
+   acceptance the second does not.

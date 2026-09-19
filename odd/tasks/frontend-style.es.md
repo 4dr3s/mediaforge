@@ -10,9 +10,10 @@
 registradas en *Decisiones tomadas con el supervisor*, más los hechos de la herramienta medidos en
 §1.1 del log de evidencia. `openspec/changes/audio-extract-vertical-slice/` queda intacto por esta
 feature.
-**Estado:** `in progress` — creada el 2026-09-19. Las tareas 1.1–1.5 tienen evidencia; la feature no
-se declara `closed`, porque lo que difiere (instalar la herramienta, cablear el MCP, escribir la skill
-de estilo) son features separadas con su propia aceptación en runtime, no residuos de esta.
+**Estado:** `closed` para sus cinco tareas — creada el 2026-09-19 y cerrada el mismo día, unidad de
+trabajo `0b8e434` en `docs/frontend-style-decision`. Los tres ítems diferidos (instalar la herramienta,
+cablear la entrada MCP, escribir la skill de estilo) son **features separadas, no residuos**: cada uno
+carga una aceptación en runtime que una tarea de Markdown no puede reclamar.
 
 ---
 
@@ -220,25 +221,28 @@ commits se prefirieron una vez que existió un commit.
 - **Estrategia:** `single-pr`. Un par de documentos, una unidad de trabajo, sin dependencia de ninguna
   otra rama.
 - **Pronóstico, corregido en el lugar:** el pronóstico era **menos de 400 líneas autoradas para el par**.
-  Medido: **1048** líneas autoradas (`frontend-style.md` 513,
-  `frontend-style.es.md` 535), solo adiciones — ambos archivos son nuevos, así que cada uno
+  Medido: **1136** líneas autoradas (`frontend-style.md` 556,
+  `frontend-style.es.md` 580), solo adiciones — ambos archivos son nuevos, así que cada uno
   aporta su conteo de líneas y cero eliminaciones. El pronóstico se equivocó por un factor de
-  2.6 y queda visible acá en vez de sobrescrito, que es la regla que este bullet se fijó a sí
+  2.8 y queda visible acá en vez de sobrescrito, que es la regla que este bullet se fijó a sí
   mismo cuando falló.
-- **El espejo es 51.0% del costo** — 535 de 1048 líneas. Eso reproduce la
+- **El espejo es 51.1% del costo** — 580 de 1136 líneas. Eso reproduce la
   constante que `odd-doc-structure` §1.1 midió a lo largo de cuatro features (el espejo en ~49–51% de
   cada par), que ahora son cinco features y la misma constante. Es el costo de entrega que ningún
   documento de este repositorio había contado antes de esa feature, y es la razón por la que un
   presupuesto de 400 líneas y un *documento* de 400 líneas no son lo mismo.
-- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1048 líneas, el par
-  queda en 2.62× el presupuesto advisory de 400. Acá no hay nada inflado y nada se va a
+- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1136 líneas, el par
+  queda en 2.84× el presupuesto advisory de 400. Acá no hay nada inflado y nada se va a
   encoger para llegar a 400: los dos archivos son un documento de decisión y su copia de estudio
   requerida, y recortar cualquiera de los dos para entrar en el número eliminaría la decisión o la regla
   del espejo. La lectura honesta es que el presupuesto de 400 es una unidad de *review* para código, y
   que la convención de espejo de este repositorio viene empujando a los pares de documentación por
   encima desde la primera feature — la medición es el hallazgo, no la falla.
 - **Fronteras de slice:** ninguna, porque no hacen falta. El trabajo es un par de documentos; no hay nada
-  que apilar.
+  que apilar. Aterrizó como **una unidad de trabajo, `0b8e434`**, un commit por delante de `origin/main`, y
+  el registro de cierre en §1.5 es el commit inmediatamente siguiente en la misma rama — que es por lo que
+  el propio commit de la entrada de cierre no se nombra en ningún lado: no se puede. Dos commits, una
+  rama, sin apilado.
 - **No entregado por esta feature:** la instalación de la herramienta, la entrada MCP del harness,
   cualquier valor de estilo y el scaffold de Next.js. Ver *Fuera de alcance*.
 
@@ -302,10 +306,11 @@ El estado es `[x]` sólo donde el registro de evidencia tiene prueba observada d
 | 1.2 | Decisión y consecuencias, inglés canónico | `[x]` | §1.2 |
 | 1.3 | Espejo en español, bloques idénticos byte a byte | `[x]` | §1.3 |
 | 1.4 | Verificación, mecánica y registrada | `[x]` | §1.4 |
-| 1.5 | Cierre | `[ ]` | — |
+| 1.5 | Cierre | `[x]` | §1.5 |
 
-La tarea 1.5 está `[ ]` con su razón declarada: el cierre no se puede evidenciar mientras la unidad de
-trabajo no tenga commit, y esta feature no commitea sin instrucción explícita del supervisor.
+La tarea 1.5 está `[x]` porque la unidad de trabajo que estaba esperando existe: `0b8e434`. La entrada de
+cierre en §1.5 registra el commit, y registra honestamente que su propio commit queda necesariamente
+fuera del rango que describe — esta entrada no puede nombrar el commit que la contiene.
 
 ## Log de evidencia
 
@@ -421,12 +426,17 @@ cambios.
 Medido, en este orden:
 
 - **Contraejemplo, sobre la copia modificada:** el hash de la corrida del contraejemplo **difiere** del
-  hash de la corrida en inglés (`e0312115ea3771cdcb8f198d7bf4344d` contra `a4adcb9cc995449ba4f5392b98a908b1`). Esa divergencia es la única
+  hash de la corrida en inglés (`b8c2c8d9c848e5a00877ad81cf23df17` contra `3f3ddd21d28c3ac9ad7c0f9851e114ee`). Esa divergencia es la única
   propiedad que importa acá: un chequeo cuyo modo de falla nunca se observó todavía no es un chequeo
   (defecto D1).
-- **Inglés, la corrida real:** `a4adcb9cc995449ba4f5392b98a908b1`
-- **Espejo en español, la corrida real:** `a4adcb9cc995449ba4f5392b98a908b1` — idéntico al inglés, o el espejo está mal y esta
+- **Inglés, la corrida real:** `3f3ddd21d28c3ac9ad7c0f9851e114ee`
+- **Espejo en español, la corrida real:** `3f3ddd21d28c3ac9ad7c0f9851e114ee` — idéntico al inglés, o el espejo está mal y esta
   feature no está terminada.
+
+**Este valor se movió una vez, y el viejo queda visible.** Antes de que la entrada de cierre en §1.5
+agregara su propio bloque en fence, el par hasheaba `a4adcb9cc995449ba4f5392b98a908b1`. Agregar un bloque
+cambia el contenido que el hash cubre, así que la cifra de arriba es el valor en `HEAD` y la anterior
+queda registrada acá en vez de sobrescrita — la misma regla que sigue el pronóstico de *Delivery*.
 
 #### 1.4b — los chequeos
 
@@ -435,8 +445,8 @@ $ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
     printf '%s: ## headings=%s, fenced blocks=%s\n' "$f" \
       "$(grep -c '^## ' $f)" "$(( $(grep -c '^```' $f) / 2 ))"
   done
-odd/tasks/frontend-style.md: ## headings=14, fenced blocks=4
-odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=4
+odd/tasks/frontend-style.md: ## headings=14, fenced blocks=5
+odd/tasks/frontend-style.es.md: ## headings=14, fenced blocks=5
 
 $ for f in odd/tasks/frontend-style.md odd/tasks/frontend-style.es.md; do
     printf '%s -> ' "$(basename $f)"
@@ -456,44 +466,82 @@ frontend-style.md: §1.1 OK
 frontend-style.md: §1.2 OK
 frontend-style.md: §1.3 OK
 frontend-style.md: §1.4 OK
+frontend-style.md: §1.5 OK
 frontend-style.es.md: §1.1 OK
 frontend-style.es.md: §1.2 OK
 frontend-style.es.md: §1.3 OK
 frontend-style.es.md: §1.4 OK
+frontend-style.es.md: §1.5 OK
 
 $ printf 'open Progress state rows marked [ ]: %s (EN), %s (ES)\n' \
     "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.md | wc -l)" \
     "$(awk '/^## Progress/{p=1;next} /^## / && p{p=0} p && /^\|/ && /\[ \]/' odd/tasks/frontend-style.es.md | wc -l)"
-open Progress state rows marked [ ]: 1 (EN), 1 (ES)
+open Progress state rows marked [ ]: 0 (EN), 0 (ES)
 
 $ git status --short
-?? odd/tasks/frontend-style.es.md
-?? odd/tasks/frontend-style.md
+ M odd/tasks/frontend-style.es.md
+ M odd/tasks/frontend-style.md
 ```
 
 Los headings de campo se listan sin números de línea a propósito: el bloque que carga esta salida también
 mueve esos números, así que un número de línea absoluto registrado acá estaría desactualizado en la misma
 pasada de escritura que lo escribió. El orden y el texto textual son lo que el chequeo busca, y ambos son
 estables. El escaneo de `[x]` resuelve cada fila marcada contra un heading `### <id>` en el mismo
-documento; la única fila de estado `[ ]` es la tarea 1.5, y su razón está declarada — que es lo que el
-criterio de aceptación exige, no una prohibición general de tarea abierta.
+documento — cinco filas, cinco resoluciones, por archivo.
+
+**Un criterio de aceptación ahora pasa de forma vacua, y eso se registra en vez de contarse como un
+aprobado.** La tarea 1.4 exige que cada `[ ]` cargue una razón declarada. Con la entrada de cierre en
+§1.5, este documento tiene **cero** filas de estado abiertas, así que no hay nada para que ese criterio
+chequee: no puede fallar acá más de lo que podía antes, y no prueba nada en ningún sentido. Es la misma
+categoría que el defecto D1 registrado en este repositorio — un gate sobre un conjunto vacío no es un gate
+— y se anota en vez de reportarse como chequeo verde. El criterio se queda en el texto de la tarea porque
+una tarea reabierta lo necesitaría de nuevo.
 
 La medición de líneas autoradas vive en *Delivery* y abajo, en prosa, por la misma razón que los hashes:
 un número escrito dentro de un bloque en fence es parte del contenido que el hash de ese bloque cubre, y
 el tamaño de este documento es justamente lo que se está midiendo.
 
-**Líneas autoradas, esta unidad de trabajo:** 1048 en total — 513 en
-`frontend-style.md` y 535 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
+**Líneas autoradas, esta unidad de trabajo:** 1136 en total — 556 en
+`frontend-style.md` y 580 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
 son nuevos y por lo tanto aportan cero eliminaciones. Medido con `wc -l` contra la copia de trabajo,
 después de toda otra edición de esta pasada; la sustitución que escribió estos números reemplazó tokens
 en el lugar, así que no cambió ni el conteo de líneas ni el contenido en fence que cubre el hash de
 arriba. Esa es la razón por la que los números pueden ser exactos acá mientras que una cifra dentro de un
 bloque en fence no podría serlo.
 
-### 1.5 — cierre (pendiente)
+### 1.5 — cierre (2026-09-19)
 
-Sin entrada. La tarea 1.5 está `[ ]`: la unidad de trabajo está sin commitear, y esta feature commitea
-solo con instrucción explícita del supervisor.
+La unidad de trabajo existe. Salida cruda, sin editar:
+
+```text
+$ git show --stat --format="" HEAD
+ odd/tasks/frontend-style.es.md | 535 +++++++++++++++++++++++++++++++++++++++++
+ odd/tasks/frontend-style.md    | 513 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 1048 insertions(+)
+
+$ git rev-list --count origin/main..HEAD
+1
+
+$ git log -1 --format="%H %s"
+0b8e43461c400e5b3af5e0b320675cb876271c5c docs(odd): record the frontend mockup tool and the style source of truth
+```
+
+La cifra `1048` de ese bloque son las estadísticas del propio commit, y está **congelada ahí a propósito**:
+como §1.4b declara que el conteo de líneas autoradas de este documento se mueve con cada edición, un
+documento que citara su tamaño actual dentro de un transcript de commit estaría citando un número que el
+propio transcript invalida. El conteo del commit es historia; el conteo actual se declara en §1.4b, en
+prosa, y se actualiza en la pasada que lo vuelve verdadero.
+
+**Lo que el cierre no afirma.** El commit de arriba es el entregable. El commit que *contiene esta entrada*
+queda necesariamente fuera del rango que describe, así que no se nombra — nombrarlo exigiría conocer un
+hash antes de escribir el archivo que lo computa. Es la misma frontera que `odd-doc-structure` registró
+para su slice 1.7, y se declara en vez de esconderse.
+
+**Lo que queda abierto, y no es trabajo residual.** Los tres ítems diferidos de *Fuera de alcance* —
+instalación, entrada de harness, skill de estilo — son el *Next step*, y son features separadas a
+propósito: dos de ellas tienen criterios de aceptación en runtime (el CLI responde `openpencil --help`; el
+servidor MCP responde a una llamada real de un cliente con `OPENPENCIL_MCP_ROOT` confinado) que ninguna
+tarea de Markdown puede satisfacer ni evidenciar.
 
 ## Fuera de alcance
 
@@ -522,14 +570,11 @@ solo con instrucción explícita del supervisor.
 
 ## Next step
 
-La decisión está registrada y el trabajo diferido está nombrado. Dos acciones pertenecen al supervisor, y
-ninguna se toma acá:
+Esta feature está cerrada. Dos acciones pertenecen al supervisor, y ninguna se toma acá:
 
-1. **Rama y commit para este par de documentos.** El trabajo se escribió sobre la rama checkouteada
-   `feat/wu3-contract-fixes`, que es `origin/main` más dos commits de una unidad de trabajo ajena
-   (`516ca56`, `608c375`). Una rama `docs/*` cortada desde `origin/main` mantiene las dos cosas
-   separadas; commitear acá metería una decisión de frontend dentro de un PR de arreglo de contratos. No
-   se hace ningún commit sin la instrucción.
+1. **Pushear y abrir el PR** para `docs/frontend-style-decision`. La rama carga una unidad de trabajo más
+   el commit de cierre; matchea el patrón de rama de la política del CI, y el PR necesita exactamente una
+   label `type:*` (`type:docs`). Pushear es un acto de entrega, no de review, y es decisión del supervisor.
 2. **Cuál feature diferida viene después** — instalar la herramienta y cablear la entrada MCP confinada,
-   o escribir la skill de estilo local al proyecto. Son independientes, y la primera tiene una aceptación
+   o escribir la skill de estilo local al proyecto. Son independientes, y la primera carga una aceptación
    en runtime que la segunda no.
