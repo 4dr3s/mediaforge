@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "open-pencil": {
-      "command": "bun",
-      "args": ["x", "openpencil-mcp"],
+      "command": "openpencil-mcp",
       "env": {
         "OPENPENCIL_MCP_ROOT": "apps/web/design"
       },

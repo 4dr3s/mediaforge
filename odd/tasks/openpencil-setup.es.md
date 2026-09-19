@@ -10,7 +10,7 @@ de alcance* nombró la instalación como feature separada con su propia aceptaci
 la nombró como elección del supervisor. Esta feature ejecuta eso, y la restricción dura del ADR sobre
 `OPENPENCIL_MCP_ROOT` es criterio de aceptación acá, no una nota.
 **Estado:** `closed` — creada y cerrada el 2026-09-19 en `chore/openpencil-setup`, un commit por encima
-de `73e6994`, la corrección del ADR de la que depende. Cuatro de las seis tareas están verificadas en
+de `73e6994`, la corrección del ADR de la que depende. Seis de las siete tareas están verificadas en
 runtime; la tarea 1.5 está abierta a propósito y lo dice. Este documento no declara su propio hash de commit:
 no puede citar el commit que lo contiene, la misma frontera que registró `frontend-style` §1.5.
 
@@ -90,8 +90,7 @@ También se midieron tres cosas de la máquina, y cada una contradice `openspec/
 {
   "mcpServers": {
     "open-pencil": {
-      "command": "bun",
-      "args": ["x", "openpencil-mcp"],
+      "command": "openpencil-mcp",
       "env": {
         "OPENPENCIL_MCP_ROOT": "apps/web/design"
       },
@@ -109,11 +108,18 @@ Cuatro elecciones deliberadas, cada una medida en vez de asumida:
    clavado un layout de máquina dentro de un archivo compartido, y este repositorio tiene dos worktrees vivos hoy.
 2. **Commiteada, no global a la máquina.** Un archivo commiteado es revisable, viaja con la rama, y documenta
    el confinamiento a quien lea el diff. Una entrada en `~/.pi/agent/mcp.json` no se lo documenta a nadie.
-3. **`bun x`, no `bunx`.** Medido: **`bunx` no existe** en bun 1.4.2 — `~/.bun/bin` contiene `bun`,
-   `openpencil`, `openpencil-mcp`, `openpencil-mcp-http` y nada más. La forma de entrada que documenta el
-   skill de agentes de la propia OpenPencil (`{"command":"bunx"}`) habría fallado en el primer arranque. Es la
-   clase de detalle que es invisible hasta que deja de serlo, y es el argumento para correr la aceptación en
-   vez de escribirla.
+3. **Sin `bun` en el arranque — y esto llevó dos intentos.** La primera forma shippeada fue
+   `{"command":"bun","args":["x","openpencil-mcp"]}`, elegida después de medir que **`bunx` no existe**
+   en bun 1.4.2 — el propio skill de agentes de OpenPencil documenta `{"command":"bunx"}`, que habría
+   fallado en el primer arranque. Esa forma estaba *igual* de mal, por una razón que esta sesión no
+   encontró: **`bun` no está en el PATH del proceso que lanza Pi**, así que el servidor habría fallado al
+   spawnear con un `command not found` — un error que se lee como un OpenPencil roto y no como una entrada
+   de PATH faltante. La forma shippeada ahora es `{"command":"openpencil-mcp"}`, que resuelve a través del
+   directorio bin propio de Pi (`~/.pi/agent/bin`, siempre primero en el PATH) porque el `dist/stdio.mjs`
+   del paquete lleva shebang `#!/usr/bin/env node` y `node` sí está en el PATH. **El arranque depende de
+   node; solo la instalación depende de bun** — las dos cosas estuvieron confundidas hasta que eso costó un
+   defecto. Lo encontró la sesión par `01a0b75f-7ce3-728c-85b8-02b9f4d8ad5a`, no la aceptación de esta
+   sesión: la aceptación testeó el *servidor* y nunca testeó que el *lanzador* pudiera encontrarlo.
 4. **`lifecycle: lazy`.** El servidor se levanta bajo demanda. Medido: arranca bien incluso cuando el root no
    existe y falla recién en la llamada de herramienta, así que un checkout sin `apps/web/design` no puede
    romper una sesión por el solo hecho de tener la configuración.
@@ -130,8 +136,8 @@ trampa, no un cinturón y tirantes.
 - **Estrategia:** `single-pr`. Una unidad de trabajo, una rama, apilada sobre `docs/frontend-style-decision`
   porque esta feature implementa ese ADR y lo cita por archivo; la base del PR es esa rama, así un revisor ve
   la instalación y no el documento de decisión otra vez.
-- **Pronóstico:** los archivos de repositorio son `826` líneas autoradas en el par de
-  documentos (`414` en inglés, `412` en español) — el espejo español es `49.9%`
+- **Pronóstico:** los archivos de repositorio son `942` líneas autoradas en el par de
+  documentos (`472` en inglés, `470` en español) — el espejo español es `49.9%`
   del costo, que es la constante medida de este repositorio por quinta feature consecutiva. La instalación en sí
   no aporta líneas de repositorio; cambia la máquina.
 - **Fronteras de slice:** ninguna. Hay un archivo de configuración, un directorio y un par de documentos.
@@ -191,6 +197,21 @@ del defecto D1 de este repositorio aplica a sus propios documentos.
 **Aceptación:** la salida cruda está en §1.6, el contraejemplo diverge, y la única fila abierta se nombra en
 vez de contarse.
 
+### 1.7 — Corregir el lanzador que la aceptación nunca testeó · owner: AI
+
+El primer `.mcp.json` shippeado arrancaba el servidor con `{"command":"bun"}`, y `bun` no está en el PATH
+del proceso que lanza Pi. Todas las corridas de aceptación de arriba invocaban el servidor *directamente*,
+desde un shell que tenía `~/.bun/bin` exportado — así que lo único nunca ejercitado fue el lanzador mismo.
+Un servidor muerto habría parecido un OpenPencil roto.
+
+Lo encontró la sesión par `01a0b75f-7ce3-728c-85b8-02b9f4d8ad5a`, que midió `command -v bun` como vacío
+dentro del entorno de Pi y lo dijo sin que se lo pidieran. Es el segundo defecto de esta feature que caza un
+par y que su propia aceptación no cazó.
+
+**Aceptación:** el `command` de la configuración resuelve desde el entorno propio de Pi sin editar perfiles
+ni exportar nada a mano; el handshake y el confinamiento siguen sosteniéndose por ese camino; y la corrección
+se registra como su propia unidad de trabajo en vez de reescribirse en silencio sobre la equivocada.
+
 ## Progress
 
 | ID | Tarea | Estado | Evidencia |
@@ -201,6 +222,7 @@ vez de contarse.
 | 1.4 | ADR corregido | `[x]` | §1.4 |
 | 1.5 | Lo que no se verificó | `[ ]` | §1.5 |
 | 1.6 | Verificar este par mecánicamente | `[x]` | §1.6 |
+| 1.7 | Corregir el lanzador que la aceptación nunca testeó | `[x]` | §1.7 |
 
 La tarea 1.5 está `[ ]` con su razón declarada, y esta es la lectura honesta de la regla del propio repositorio
 de que un `[x]` necesita prueba observada: los tres ítems de §1.5 son cosas que nadie observó, incluida esta
@@ -377,8 +399,8 @@ open rows  : EN=1 ES=1 (0 = the "every [ ] has a reason" criterion is vacuous)
 La única fila abierta es la tarea 1.5, y carga una razón declarada — así que **el criterio de `[ ]` no es vacuo
 acá**, lo que distingue este par de `frontend-style`, donde cerrar todas las tareas dejó ese criterio sin nada
 que chequear y se registró como vacuo en vez de verde. Los valores de hash en sí se declaran en prosa, por la
-convención del §1.4 del otro documento, no acá: este bloque vive dentro del contenido que hashea. Medido: el par hashea `2489769664d00f69e364cbaf85cafb8d` de los dos lados, y la corrida del
-contraejemplo hashea `992229a9a857dfc32d5e32895805c2a8` — distintos, así que la comparación puede fallar.
+convención del §1.4 del otro documento, no acá: este bloque vive dentro del contenido que hashea. Medido: el par hashea `9270518260109f35c5c7906ab57c4186` de los dos lados, y la corrida del
+contraejemplo hashea `65b8b4a94f1032d8c5a4eb596094d54b` — distintos, así que la comparación puede fallar.
 
 **Una brecha que esta feature deja, declarada en vez de insinuada.** El chequeo de arriba es un *transcript*.
 El script que lo produjo vive en `/tmp` y no está en el repositorio, así que rerunearlo significa volver a
@@ -387,6 +409,42 @@ rerunear es un chequeo que nadie va a rerunear, que es la falla que este reposit
 D1 en otra forma. Commitear el script — o cablear estas aserciones al job `lint` del CI existente — le
 corresponde a quien toque estos dos pares de documentos después, y queda nombrado acá para que no se
 redescubra como sorpresa.
+
+### 1.7 — el defecto del lanzador, corregido (2026-09-19)
+
+La medición que refutó la configuración shippeada, y el arreglo, crudo:
+
+```text
+$ command -v bun
+                                # empty: ~/.bun/bin is NOT on the PATH Pi passes to its children
+$ echo "$PATH" | tr ':' '\n' | head -3
+/home/yorsh/.pi/agent/bin
+/home/yorsh/.local/bin
+/home/yorsh/.nvm/versions/node/v25.9.0/bin
+
+$ head -1 ~/.bun/install/global/node_modules/@open-pencil/mcp/dist/stdio.mjs
+#!/usr/bin/env node
+
+$ ln -sf ~/.bun/bin/openpencil-mcp ~/.pi/agent/bin/openpencil-mcp
+$ command -v openpencil-mcp
+/home/yorsh/.pi/agent/bin/openpencil-mcp
+$ printf '{...initialize...}' | openpencil-mcp
+{"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"open-pencil","version":"0.15.1"}},"jsonrpc":"2.0","id":1}
+$ open_file {"path":"/etc/hosts"}
+{"error":"Path is outside the allowed root: /tmp/opnroot"}
+```
+
+Se instalaron tres symlinks en `~/.pi/agent/bin` (`openpencil`, `openpencil-mcp`, `openpencil-mcp-http`) —
+un cambio de máquina, fuera del repositorio, y reversible borrándolos. Se usa el directorio bin propio de Pi
+a propósito, porque ya está primero en el PATH de todo proceso de Pi, así que la configuración commiteada no
+necesita editar perfiles en ninguna máquina que tenga los paquetes instalados.
+
+**Qué tienen en común los dos defectos, que es la lección real.** §1.3 testeó el servidor invocándolo
+directamente; §1.7 es el mismo servidor fallando en una capa que nadie invocó. Todos los chequeos de este
+documento eran chequeos *asistidos*: configuraban el entorno para la cosa bajo test. Una configuración cuyo
+valor es "funciona cuando yo mismo preparo el entorno" no está verificada; está verificada menos la parte
+que se rompe. El `lifecycle: lazy` escondió esto un poco más: un servidor lazy que no puede spawnear no
+produce error al inicio de sesión, solo silencio hasta que alguien llame una herramienta.
 
 ## Fuera de alcance
 
