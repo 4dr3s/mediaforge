@@ -187,8 +187,8 @@ outcome per work unit live in the evidence log, where they were recorded as the 
 | 1.1 | RED: the two parity suites | `[x]` | §1.1 |
 | 1.2 | GREEN: the contract, the registry, the fixtures and the two validators | `[x]` | §1.2 |
 | 1.3 | RDD conformance, per work unit | `[x]` | §1.3 |
-| 1.3a | Apply the verifier's fix plan (F1, F2, F3) | `[ ]` | — |
-| 1.4 | Closure | `[ ]` | — blocked on 1.3a: the verifier's fix plan (F1, F2, F3, §1.3) is unapplied |
+| 1.3a | Apply the verifier's fix plan (F1, F2, F3) | `[x]` | §1.3a — four commits, 370 lines, verified twice, native review `approved` and burned |
+| 1.4 | Closure | `[ ]` | — the last open task now that §1.3a is applied and its review is closed |
 
 Task 1.3 is `[x]` because the verification it asks for *ran* and its refutations are recorded; it is
 not a statement that the feature is sound. What it refuted is exactly what task 1.3a then applied.
@@ -332,6 +332,134 @@ merely by a post-parse key check; the numeric limits duplicated nowhere but the 
   measured over the **domain** and not over the sample.
 - **F3**: narrow the scan to Redis-specific tokens and include both validator modules.
 
+### 1.3a — the fix plan applied, verified twice, and reviewed (2026-09-18)
+
+Four work-unit commits on `feat/wu3-contract-fixes`, all **local and unpushed**: `516ca56` (this
+task's tracking), `608c375` (F1, F2, F3), `66ec44f` (the three findings of the first verification
+round) and `f598a30` (the offset grammar). **370 authored lines** — 330 additions, 40 deletions,
+14 files — inside the 400-line budget this repository set for itself.
+
+**The three fixes, each proven by mutation rather than by report.**
+
+- **F1.** Both suites now read `contracts/dispatch-envelope.schema.json` from disk and assert its
+  semantics. Four schema mutations, one at a time, each making **both** suites fail and each
+  reverted afterwards: `additionalProperties: true`; the version `const` to `…v2`; `format:
+  date-time` to `date`; a fourth property added. The assertions are born green by design — the file
+  was already correct — so the mutation *is* the RED.
+- **F2.** The four documents the Python side accepted while zod rejected them were added as
+  fixtures **first**, and the Python gate failed on exactly those four while the TypeScript gate
+  stayed green: the parity defect itself, observed, not argued. `occurred_at` is now two gates — the
+  regex pins the grammar, `datetime.fromisoformat` supplies the calendar and the offset range — and
+  the order matters: reversed, `fromisoformat` alone would accept `+0000`, an offset without the
+  colon.
+- **F3.** The vocabulary scan names Redis machinery only (`xadd`, `xreadgroup`, `xack`,
+  `xautoclaim`, `xgroup`, `xautoclave`, `group`, `stream`, `delivery_count`, `redis`), releasing
+  `consumer` — the specification's own word for the two runtimes — and it now covers both zod
+  validators and the pydantic models. Planted tokens in all three validator modules fail both
+  suites.
+
+**The independent verification refuted the first attempt, and the refutation was right.** The
+calendar gate had *created* a divergence: `0000-09-17T12:00:00Z` was accepted by zod and rejected by
+pydantic, where before this task **both** accepted it. Two further findings: the schema's property
+*types* were still unasserted (`properties.job_id.type: "number"` passed both suites), and
+narrowing the scan had released `stream` and `group`, which C3 forbids by name. All three were
+closed in `66ec44f`:
+
+- the instant domain is stated as **years 0001–9999** and enforced on both runtimes: a `pattern` of
+  `^(?!0000)` in the schema — a negative prefix check, deliberately not a fourth copy of the
+  grammar, which could not check the calendar and would read like the definition of the field — an
+  explicit `.refine` in the zod validator, and the existing Python calendar gate. Measured by
+  fixture: `year-zero-occurred-at.json` is rejected by both, with Python rejecting it at gate 2,
+  and `boundary-min-year.json` / `boundary-max-year.json` pin the other edge so the narrowing
+  cannot silently become "only modern dates";
+- both property types are asserted, each proven to fail both suites on mutation;
+- `stream`, `group` and `xautoclave` are back in the list, and only `consumer` was released.
+
+**A fourth defect, pre-existing, found while reviewing that fix.** `datetime.fromisoformat`
+*normalises* an offset's components instead of range-checking them: `+02:60` became `+03:00` and
+`+02:99` became `+03:39`, while zod rejected both — so the Python worker would have processed an
+envelope the producer could never emit. The grammar gate now pins the offset to RFC 3339's own
+grammar, `[+-](?:[01]\d|2[0-3]):[0-5]\d`, and
+`offset-minutes-out-of-range-occurred-at.json` measures it. A 30-document domain matrix returned
+identical verdicts from the real zod validator and the real Python parser. This one predates the
+fix plan: the original regex carried the same permissive `[+-]\d{2}:\d{2}`.
+
+**The second verification round: `holds`.** An exhaustive lattice of **6060 documents** — every
+offset `[+-]HH:MM` for hours 00–26 and minutes 00–99, plus sweeps of hour/minute/second, month, day
+across the twelve months and February in a leap and a non-leap year, the year boundaries
+(`0000–0002`, `1899–1901`, `1999–2001`, `9998–9999`, one above the four-digit range), and the lexical
+edges (`T`/`t`/space, `Z`/`z`, date-only, offset-less, `+0000`, zero to ten fractional digits, a
+trailing dot, leap-second forms) — produced **zero disagreements** between the two runtimes, and
+every verdict also matched an independent expectation model. Two measurement traps were caught in
+the process and are worth keeping: `z.string().datetime()` alone is *not* the TypeScript validator
+(the year-0000 exclusion lives in a `.refine`), and `wc -l` counts terminators while `grep -c ''`
+counts items.
+
+R1–R3 of §1.3 are **closed**; R4 (`quality` duplicated by construction) stands as the accepted,
+policed duplication it was recorded as.
+
+**A message-only rewrite, recorded because it affects how this document may be cited.**
+`f8b918c` and `a14ed38` were rewritten to `66ec44f` and `f598a30` to correct an inaccurate clause in
+one commit message. The trees are identical (`0d8c3cf…` and `e7511d70…`) and the range's patch
+digest is unchanged (`fd1026535d86ac61…`, 599 lines), so the verification applies to the content
+that stands. The replaced commits are unreachable and will eventually be pruned, so **this document
+cites the live commits plus the tree equality**, never the dead ones.
+
+**Gates.** `pnpm --filter api exec vitest run test/contract.parity.spec.ts` → **19 passed**;
+`uv run --project workers/media pytest workers/media/tests/test_contract_parity.py -q` → **20
+passed**; `uvx --from ruff==0.16.8 ruff check workers/media` → clean. The TypeScript gate runs
+through the Windows toolchain (`cmd.exe /c …`), because `node_modules` in this working tree is a
+Windows install and vitest cannot start from the WSL shell. `apps/api/test/schema.spec.ts`,
+`apps/api/test/harness.spec.ts` and `workers/media/tests/test_db_privileges.py` fail locally for
+lack of PostgreSQL — there is no Docker daemon in this distro — and are green in CI; this task did
+not touch them.
+
+**The native review: `approved`, then burned.** Lineage `review-8e2cde82d8c27d94`, **medium** risk,
+one consolidated lens (`review-reliability`), 14 changed files, 370 lines, correction budget 185.
+The acknowledgement consumed revision `sha256:d83fea73…` with `authority: burned` and
+`burn_evidence: gentle-ai.review-acknowledged/v1`. Two **advisory** findings, both `SUGGESTION` /
+`informational`, neither opening a correction and neither a reason to re-run the review: `R3-001` at
+`workers/media/src/mediaforge/contracts.py:94-95` and `R3-002` at `:103-108` — in the reviewed
+revision those are the gate-2 comment block and the `try`/`except` calendar check. They are recorded
+here as follow-up work.
+
+**The review ran on a staged presentation of the same content, and that is not a technicality.**
+With the worktree clean, the committed-range route could not start (blocker 3 below), so the four
+commits were left untouched on `feat/wu3-contract-fixes` and the identical change set was presented
+to the provider as **staged changes over `origin/main`** on a temporary branch. The index's
+`sha256` was unchanged, the staged diff was exactly `git diff 0bb898a f598a30` (14 files, 330/40),
+and the candidate tree the provider froze was `e7511d70…` — the same tree as `f598a30`. The
+review's `delivery` outcome is `ordinary-repository-policy`: nothing was pushed, and nothing was
+merged.
+
+**RDD's own gate, for the record.** `assess` returned `risk: unassessable` with
+`native-assess-unavailable` (a schema-incompatible native response), `rddLine: on`, and a plan
+requiring a separate independent verifier in addition to the writer's self-verification — which is
+what §1.3's second round is. That assessment never mutated review authority.
+
+**Four environment blockers, recorded because they are not the candidate's fault.** Each was
+measured, and each was a hard stop until it was fixed in the environment:
+
+1. **The mount could not store POSIX modes.** `/mnt/c` is 9p/DrvFs mounted without `metadata`, so
+everything read as `0777` and `chmod` was a no-op. The review's candidate view asserts
+`(mode & 0o077) == 0`, which that mount cannot satisfy — measured against a native filesystem,
+`mkdirSync(mode 0o700)` produced `777` on `/mnt/c` and `700` there. Fixed by the supervisor:
+`[automount] options = "metadata"` in `/etc/wsl.conf`, a WSL restart, and one `chmod 700` on the
+shared `candidate-views` directory. Nothing was deleted.
+2. **git 2.34.1 is too old.** The candidate-view builder calls `git worktree list --porcelain -z`;
+2.34.1 answers `unknown switch 'z'` (exit 129), and the facade reports that as a candidate-view
+failure. Fixed by installing git 2.55.0 from the `git-core/ppa` PPA.
+3. **The committed-range route is not wired in gentle-pi 3.2.1.** `start` with `baseRef` +
+`committedOnly` always ended in `schema-incompatible`: the facade re-runs the native STATUS with
+`--projection workspace`, and with a clean worktree that candidate is empty *by construction*, so
+STATUS answers `collect` / `empty_candidate_base_ref_required` and no executable `start` transition
+exists. The input schema does not expose `projection`, and the native's own `--projection staged`
+is never passed. Resolved by the staged presentation described above.
+4. **Managed assets were stale.** The stop `managed_assets_outdated` prescribed the pinned 3.2.1
+binary's own sync; it reported "All managed assets are already up to date. No files changed" and
+only rewrote the recorded digest (`944fa704…` → `61ae1c61…`). The root cause is a version skew: the
+global `gentle-ai` is 3.3.0 while the Pi package pins 3.2.1.
+
 ## Out of scope
 
 - The registry loaders and any code that *uses* the registry to validate a submission (WU-4) or to
@@ -345,9 +473,11 @@ merely by a post-parse key check; the numeric limits duplicated nowhere but the 
 
 ## Next step
 
-Task 1.4 — the closure — is the only open task that remains once 1.3a lands, and task 1.3a is the work
-in flight: it applies the verifier's fix plan (F1, F2, F3) from §1.3. Closure means
-`contracts/README.md` and this document agree with what exists, the `.es.md` mirror is
-regenerated and verified byte-identical on its code blocks, and the gates are recorded. Delivery —
-push, pull request, merge — remains the supervisor's decision under ordinary repository policy, as
-every prior feature's closure recorded.
+Task 1.4 — the closure — is the only open task left. §1.3a applied the verifier's fix plan (F1, F2,
+F3) from §1.3, closed the three findings of the first verification round and the pre-existing offset
+defect found while reviewing it, and its native review is `approved` and burned. Closure means
+`contracts/README.md` and this document agree with what exists — including the scan, which now
+covers both validator modules — the `.es.md` mirror is regenerated and verified byte-identical on
+its code blocks, and the gates are recorded. Delivery — push, pull request, merge — remains the
+supervisor's decision under ordinary repository policy: the four commits are local, the branch has
+no upstream, and the review's own `delivery` outcome is `ordinary-repository-policy`.
