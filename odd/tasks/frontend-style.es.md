@@ -255,17 +255,17 @@ commits se prefirieron una vez que existió un commit.
 - **Estrategia:** `single-pr`. Un par de documentos, una unidad de trabajo, sin dependencia de ninguna
   otra rama.
 - **Pronóstico, corregido en el lugar:** el pronóstico era **menos de 400 líneas autoradas para el par**.
-  Medido: **1302** líneas autoradas (`frontend-style.md` 637,
-  `frontend-style.es.md` 665), solo adiciones — ambos archivos son nuevos, así que cada uno
+  Medido: **1323** líneas autoradas (`frontend-style.md` 647,
+  `frontend-style.es.md` 676), solo adiciones — ambos archivos son nuevos, así que cada uno
   aporta su conteo de líneas y cero eliminaciones. El pronóstico se equivocó por un factor de
   3.3 y queda visible acá en vez de sobrescrito, que es la regla que este bullet se fijó a sí
   mismo cuando falló.
-- **El espejo es 51.1% del costo** — 665 de 1302 líneas. Eso reproduce la
+- **El espejo es 51.1% del costo** — 676 de 1323 líneas. Eso reproduce la
   constante que `odd-doc-structure` §1.1 midió a lo largo de cuatro features (el espejo en ~49–51% de
   cada par), que ahora son cinco features y la misma constante. Es el costo de entrega que ningún
   documento de este repositorio había contado antes de esa feature, y es la razón por la que un
   presupuesto de 400 líneas y un *documento* de 400 líneas no son lo mismo.
-- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1302 líneas, el par
+- **El presupuesto se excede, y se reporta en vez de argumentarlo.** Con 1323 líneas, el par
   queda en 3.25× el presupuesto advisory de 400. Acá no hay nada inflado y nada se va a
   encoger para llegar a 400: los dos archivos son un documento de decisión y su copia de estudio
   requerida, y recortar cualquiera de los dos para entrar en el número eliminaría la decisión o la regla
@@ -463,11 +463,11 @@ cambios.
 Medido, en este orden:
 
 - **Contraejemplo, sobre la copia modificada:** el hash de la corrida del contraejemplo **difiere** del
-  hash de la corrida en inglés (`2118392227012d003175213b9928143a` contra `583cbb563acc4df760201076c26bee28`). Esa divergencia es la única
+  hash de la corrida en inglés (`5fd65f4ea1614d29174bfa8396e117e0` contra `d0fb8e25471733d796f23ec844f01c71`). Esa divergencia es la única
   propiedad que importa acá: un chequeo cuyo modo de falla nunca se observó todavía no es un chequeo
   (defecto D1).
-- **Inglés, la corrida real:** `583cbb563acc4df760201076c26bee28`
-- **Espejo en español, la corrida real:** `583cbb563acc4df760201076c26bee28` — idéntico al inglés, o el espejo está mal y esta
+- **Inglés, la corrida real:** `d0fb8e25471733d796f23ec844f01c71`
+- **Espejo en español, la corrida real:** `d0fb8e25471733d796f23ec844f01c71` — idéntico al inglés, o el espejo está mal y esta
   feature no está terminada.
 
 **Este valor se movió una vez, y el viejo queda visible.** Antes de que la entrada de cierre en §1.5
@@ -482,9 +482,20 @@ headings   : same count in both -> equal
 fences     : same count in both -> equal
 blocks md5 : EN vs ES -> equal
 field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
-pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+pointers   : 0 unresolved [x] rows (0 = every [x] resolves to an evidence entry in the evidence log, not to a task header)
 open rows  : EN=0 ES=0 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
+
+**Este chequeo no podía fallar, y el reporte de una sesión par es la razón de que ahora sí pueda.** El
+resolver matcheaba `### <id>` en cualquier lugar del archivo — y cada id aparece dos veces, una como
+cabecera de tarea bajo `## Tasks` y otra como entrada de evidencia bajo el log de evidencia — así que
+matcheaba la *cabecera* y habría pasado con la entrada de evidencia borrada. Demostrado, no inferido: una
+copia de este documento con la entrada de evidencia de §1.1 (40 líneas) eliminada seguía reportando
+`0 unresolved`. El resolver ahora está acotado a la sección de evidencia, y esa misma copia mutilada
+reporta `UNRESOLVED §1.1`, así que el chequeo quedó mostrado capaz de fallar — el estándar que
+`odd-doc-structure` §1.6 fijó para un chequeo de esta clase. La sesión par encontró la misma ambigüedad en
+su propio documento; esta instancia era peor, porque el chequeo débil era lo que certificaba los propios
+punteros de evidencia.
 
 Los headings de campo se listan sin números de línea a propósito: el bloque que carga esta salida también
 mueve esos números, así que un número de línea absoluto registrado acá estaría desactualizado en la misma
@@ -534,8 +545,8 @@ La medición de líneas autoradas vive en *Delivery* y abajo, en prosa, por la m
 un número escrito dentro de un bloque en fence es parte del contenido que el hash de ese bloque cubre, y
 el tamaño de este documento es justamente lo que se está midiendo.
 
-**Líneas autoradas, esta unidad de trabajo:** 1302 en total — 637 en
-`frontend-style.md` y 665 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
+**Líneas autoradas, esta unidad de trabajo:** 1323 en total — 647 en
+`frontend-style.md` y 676 en `frontend-style.es.md`, solo adiciones, ya que ambos archivos
 son nuevos y por lo tanto aportan cero eliminaciones. Medido con `wc -l` contra la copia de trabajo,
 después de toda otra edición de esta pasada; la sustitución que escribió estos números reemplazó tokens
 en el lugar, así que no cambió ni el conteo de líneas ni el contenido en fence que cubre el hash de

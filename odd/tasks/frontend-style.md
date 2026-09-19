@@ -244,16 +244,16 @@ commit existed.
 
 - **Strategy:** `single-pr`. One document pair, one work unit, no dependency on any other branch.
 - **Forecast, corrected in place:** the forecast was **under 400 authored lines for the pair**. Measured:
-  **1302** authored lines (`frontend-style.md` 637, `frontend-style.es.md`
-  665), additions only — both files are new, so each contributes its line count and zero
+  **1323** authored lines (`frontend-style.md` 647, `frontend-style.es.md`
+  676), additions only — both files are new, so each contributes its line count and zero
   deletions. The forecast was wrong by a factor of 3.3 and is kept visible here rather than
   overwritten, which is the rule this bullet set for itself when it was wrong.
-- **The mirror is 51.1% of the cost** — 665 of 1302 lines. That
+- **The mirror is 51.1% of the cost** — 676 of 1323 lines. That
   reproduces the constant `odd-doc-structure` §1.1 measured across four features (the mirror at ~49–51%
   of every pair), which is now five features and the same constant. It is the delivery cost no document
   in this repository had counted before that feature, and it is why a 400-line budget and a 400-line
   *document* are not the same thing.
-- **The budget is exceeded, and that is reported rather than argued away.** At 1302 lines the
+- **The budget is exceeded, and that is reported rather than argued away.** At 1323 lines the
   pair sits at 3.25× the 400-line advisory budget. Nothing here is padded and nothing will be
   shrunk to reach 400: the two files are one decision document and its required study copy, and cutting
   either to fit the number would delete the decision or the mirror rule. The honest reading is that the
@@ -463,10 +463,10 @@ value written in prose leaves the fenced content — and therefore the hash — 
 Measured, in this order:
 
 - **Counter-example, on the modified copy:** the counter run's hash **differs** from the English run's
-  hash (`2118392227012d003175213b9928143a` against `583cbb563acc4df760201076c26bee28`). That divergence is the only property that matters
+  hash (`5fd65f4ea1614d29174bfa8396e117e0` against `d0fb8e25471733d796f23ec844f01c71`). That divergence is the only property that matters
   here: a check whose failure mode has never been observed is not yet a check (defect D1).
-- **English, the real run:** `583cbb563acc4df760201076c26bee28`
-- **Spanish mirror, the real run:** `583cbb563acc4df760201076c26bee28` — identical to the English, or the mirror is wrong
+- **English, the real run:** `d0fb8e25471733d796f23ec844f01c71`
+- **Spanish mirror, the real run:** `d0fb8e25471733d796f23ec844f01c71` — identical to the English, or the mirror is wrong
   and this feature is not done.
 
 **This value moved once, and the old one stays visible.** Before the closure entry in §1.5 added its own
@@ -481,9 +481,19 @@ headings   : same count in both -> equal
 fences     : same count in both -> equal
 blocks md5 : EN vs ES -> equal
 field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
-pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+pointers   : 0 unresolved [x] rows (0 = every [x] resolves to an evidence entry in the evidence log, not to a task header)
 open rows  : EN=0 ES=0 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
+
+**This check could not fail, and a peer session's report is why it now can.** The resolver originally
+matched `### <id>` anywhere in the file — and every task id appears twice, once as a task header under
+`## Tasks` and once as an evidence entry under the evidence log — so it matched the *header* and would
+have passed with the evidence entry deleted. Demonstrated, not inferred: a copy of this document with
+§1.1's 40-line evidence entry removed still reported `0 unresolved`. The resolver is now bounded to the
+evidence section, and that same tampered copy reports `UNRESOLVED §1.1`, so the check has been shown able
+to fail — the standard `odd-doc-structure` §1.6 set for a check of this kind. The peer found the same
+ambiguity in its own document; this instance was worse, because the weak check was the thing certifying
+the evidence pointers themselves.
 
 The field headings are listed without line numbers on purpose: the block that carries this output
 also moves those numbers, so an absolute line number recorded here would be stale in the same
@@ -511,8 +521,8 @@ The authored-line measurement lives in *Delivery* and below, in prose, for the s
 do: a number written inside a fenced block is part of the content that block's hash covers, and this
 document's own size is what is being measured.
 
-**Authored lines, this work unit:** 1302 total — 637 in `frontend-style.md`
-and 665 in `frontend-style.es.md`, additions only, since both files are new and therefore
+**Authored lines, this work unit:** 1323 total — 647 in `frontend-style.md`
+and 676 in `frontend-style.es.md`, additions only, since both files are new and therefore
 contribute zero deletions. Measured with `wc -l` against the working tree, after every other edit in this
 pass; the substitution that wrote these numbers replaced tokens in place, so it changed neither the line
 count nor the fenced content the hash above covers. That is the reason the numbers can be exact here
