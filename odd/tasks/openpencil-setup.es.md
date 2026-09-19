@@ -136,8 +136,8 @@ trampa, no un cinturón y tirantes.
 - **Estrategia:** `single-pr`. Una unidad de trabajo, una rama, apilada sobre `docs/frontend-style-decision`
   porque esta feature implementa ese ADR y lo cita por archivo; la base del PR es esa rama, así un revisor ve
   la instalación y no el documento de decisión otra vez.
-- **Pronóstico:** los archivos de repositorio son `964` líneas autoradas en el par de
-  documentos (`483` en inglés, `481` en español) — el espejo español es `49.9%`
+- **Pronóstico:** los archivos de repositorio son `985` líneas autoradas en el par de
+  documentos (`493` en inglés, `492` en español) — el espejo español es `49.9%`
   del costo, que es la constante medida de este repositorio por quinta feature consecutiva. La instalación en sí
   no aporta líneas de repositorio; cambia la máquina.
 - **Fronteras de slice:** ninguna. Hay un archivo de configuración, un directorio y un par de documentos.
@@ -392,15 +392,26 @@ headings   : same count in both -> equal
 fences     : same count in both -> equal
 blocks md5 : EN vs ES -> equal
 field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
-pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+pointers   : 0 unresolved [x] rows (0 = every [x] resolves to an evidence entry in the evidence log, not to a task header)
 open rows  : EN=1 ES=1 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
+
+**Este chequeo no podía fallar, y el reporte de una sesión par es la razón de que ahora sí pueda.** El
+resolver matcheaba `### <id>` en cualquier lugar del archivo — y cada id aparece dos veces, una como
+cabecera de tarea bajo `## Tasks` y otra como entrada de evidencia bajo el log de evidencia — así que
+matcheaba la *cabecera* y habría pasado con la entrada de evidencia borrada. Demostrado, no inferido: una
+copia de este documento con la entrada de evidencia de §1.1 (40 líneas) eliminada seguía reportando
+`0 unresolved`. El resolver ahora está acotado a la sección de evidencia, y esa misma copia mutilada
+reporta `UNRESOLVED §1.1`, así que el chequeo quedó mostrado capaz de fallar — el estándar que
+`odd-doc-structure` §1.6 fijó para un chequeo de esta clase. La sesión par encontró la misma ambigüedad en
+su propio documento; esta instancia era peor, porque el chequeo débil era lo que certificaba los propios
+punteros de evidencia.
 
 La única fila abierta es la tarea 1.5, y carga una razón declarada — así que **el criterio de `[ ]` no es vacuo
 acá**, lo que distingue este par de `frontend-style`, donde cerrar todas las tareas dejó ese criterio sin nada
 que chequear y se registró como vacuo en vez de verde. Los valores de hash en sí se declaran en prosa, por la
-convención del §1.4 del otro documento, no acá: este bloque vive dentro del contenido que hashea. Medido: el par hashea `9270518260109f35c5c7906ab57c4186` de los dos lados, y la corrida del
-contraejemplo hashea `65b8b4a94f1032d8c5a4eb596094d54b` — distintos, así que la comparación puede fallar.
+convención del §1.4 del otro documento, no acá: este bloque vive dentro del contenido que hashea. Medido: el par hashea `da229800c5c888b3a81c2a2e918fadc0` de los dos lados, y la corrida del
+contraejemplo hashea `1d3d21fc2180c6e2102e11b034633089` — distintos, así que la comparación puede fallar.
 
 **Una brecha que esta feature deja, declarada en vez de insinuada.** El chequeo de arriba es un *transcript*.
 El script que lo produjo vive en `/tmp` y no está en el repositorio, así que rerunearlo significa volver a

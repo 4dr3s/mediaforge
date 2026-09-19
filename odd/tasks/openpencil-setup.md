@@ -137,8 +137,8 @@ belt-and-braces.
 - **Strategy:** `single-pr`. One work unit, one branch, stacked on `docs/frontend-style-decision`
   because this feature implements that ADR and cites it by file; the PR base is that branch, so a
   reviewer sees the install and not the decision document again.
-- **Forecast:** the repository files are `964` authored lines across the document pair
-  (`483` English, `481` Spanish) — the Spanish mirror is `49.9%` of the
+- **Forecast:** the repository files are `985` authored lines across the document pair
+  (`493` English, `492` Spanish) — the Spanish mirror is `49.9%` of the
   cost, which is this repository's measured constant for a fifth consecutive feature. The install
   itself contributes no repository lines; it changes the machine.
 - **Slice boundaries:** none. There is one config file, one directory and one document pair.
@@ -395,16 +395,26 @@ headings   : same count in both -> equal
 fences     : same count in both -> equal
 blocks md5 : EN vs ES -> equal
 field heads: EN=[## Delivery ## Progress ## Next step ] ES=[## Delivery ## Progress ## Next step ] -> equal
-pointers   : 0 unresolved [x] rows (0 = every one resolves to a ### <id> heading)
+pointers   : 0 unresolved [x] rows (0 = every [x] resolves to an evidence entry in the evidence log, not to a task header)
 open rows  : EN=1 ES=1 (0 = the "every [ ] has a reason" criterion is vacuous)
 ```
+
+**This check could not fail, and a peer session's report is why it now can.** The resolver originally
+matched `### <id>` anywhere in the file — and every task id appears twice, once as a task header under
+`## Tasks` and once as an evidence entry under the evidence log — so it matched the *header* and would
+have passed with the evidence entry deleted. Demonstrated, not inferred: a copy of this document with
+§1.1's 40-line evidence entry removed still reported `0 unresolved`. The resolver is now bounded to the
+evidence section, and that same tampered copy reports `UNRESOLVED §1.1`, so the check has been shown able
+to fail — the standard `odd-doc-structure` §1.6 set for a check of this kind. The peer found the same
+ambiguity in its own document; this instance was worse, because the weak check was the thing certifying
+the evidence pointers themselves.
 
 The one open row is task 1.5, and it carries a stated reason — so **the `[ ]` criterion is not vacuous
 here**, which distinguishes this pair from `frontend-style`, where closing every task left that criterion
 with nothing to check and it was recorded as vacuous rather than green. The hash values themselves are
 stated in prose in §1.4 of the other document's convention, not here: this block sits inside the content
-it hashes. Measured: the pair hashes `9270518260109f35c5c7906ab57c4186` on both sides, and the counter-example run hashes
-`65b8b4a94f1032d8c5a4eb596094d54b` — different, so the comparison can fail.
+it hashes. Measured: the pair hashes `da229800c5c888b3a81c2a2e918fadc0` on both sides, and the counter-example run hashes
+`1d3d21fc2180c6e2102e11b034633089` — different, so the comparison can fail.
 
 **A gap this feature leaves, stated rather than implied.** The check above is a *transcript*. The script
 that produced it lives in `/tmp` and is not in the repository, so re-running it means re-deriving the
