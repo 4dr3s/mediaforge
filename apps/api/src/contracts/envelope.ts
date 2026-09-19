@@ -24,7 +24,20 @@ const dispatchEnvelopeSchema = z
     job_id: z.string(),
     // RFC 3339's time-offset is mandatory (design.md §7.1); `offset: true` makes `Z` or `±HH:MM`
     // required, rejecting a bare date and a naive timestamp alike.
-    occurred_at: z.string().datetime({ offset: true }),
+    occurred_at: z
+      .string()
+      .datetime({ offset: true })
+      // The instant domain is years 0001–9999, and year 0000 is rejected loudly, never
+      // interpreted. Grounds: RFC 3339's ABNF admits any 4-digit year lexically while
+      // delegating the calendar to ISO 8601, whose calendar has no year 0000; Python's
+      // `datetime` cannot represent year 0 at all, so no runtime on this side could ever
+      // honor it; and no job exists in year 0. A producer running zod could otherwise emit
+      // a year-0000 envelope the worker would refuse — the divergence this contract exists
+      // to eliminate. `.datetime()` has already pinned the `YYYY-MM-DD…` shape, so the
+      // prefix check below is precise about year 0000.
+      .refine((instant) => !instant.startsWith('0000-'), {
+        message: 'occurred_at year must be in 0001-9999: the ISO 8601 calendar has no year 0000',
+      }),
   })
   .strict();
 

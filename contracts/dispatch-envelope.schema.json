@@ -16,9 +16,10 @@
       "type": "string"
     },
     "occurred_at": {
-      "description": "RFC 3339 instant; the time offset is mandatory.",
+      "description": "RFC 3339 instant; the time offset is mandatory, and the grammar and the calendar are `format: date-time`'s job. The instant domain is years 0001-9999: RFC 3339 delegates the calendar to ISO 8601, whose calendar has no year 0000, so a timestamp beginning 0000 is rejected, not interpreted. The `pattern` says exactly that and nothing else -- restating the full grammar here would be a fourth copy of it, and a copy that could not check the calendar would look like the definition of the field while accepting February 30th.",
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^(?!0000)"
     }
   }
 }

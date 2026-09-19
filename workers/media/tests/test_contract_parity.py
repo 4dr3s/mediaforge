@@ -46,27 +46,45 @@ from mediaforge.contracts import parse_audio_extract_params, parse_dispatch_enve
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTRACTS_DIR = REPO_ROOT / "contracts"
 
-# The Redis adapter vocabulary that must never reach the domain contract (C3: the queue port is
-# broker-agnostic). The list names Redis machinery only -- ``xadd``, ``xreadgroup``, ``xack``
-# and ``xautoclaim`` are stream commands, ``xgroup`` the group machinery, ``delivery_count`` a
-# message field, and ``redis`` the broker itself. Words like ``consumer``, ``group`` or
-# ``stream`` are deliberately absent: the specification itself calls the two runtimes
-# "consumers" (C3's "the Python consumer"), so banning them would outlaw the domain's own
-# vocabulary, not the adapter's. Prose in the contract files and the validators may therefore
-# use the domain's words freely; the scan is for the adapter's machinery, and only in the
-# files that declare or implement the contract.
+# The Redis adapter vocabulary that must never reach the domain contract (C3: the queue port
+# is broker-agnostic). The list names the adapter's machinery, not the domain's actors:
+# ``xadd``, ``xreadgroup``, ``xack``, ``xautoclaim`` and ``xgroup`` are stream commands and
+# group machinery, ``delivery_count`` a message field of the adapter, ``redis`` the broker
+# itself, and ``stream`` and ``group`` the machinery those commands operate on -- the domain
+# contract has no legitimate use for any of them (C3's own constraint forbids the contract
+# naming "Redis, streams, groups or claims"). ``xautoclave`` is the dispatch checklist's
+# deliberately misspelled variant, kept on purpose: the scan is vocabulary-presence, not
+# spelling, and a contract file containing either spelling is a leak. What is deliberately
+# absent is ``consumer``: the specification itself calls the two runtimes "consumers" (C3's
+# "the Python consumer"), and the Python validator legitimately uses the word, so banning it
+# would outlaw the domain's own actor word, not the adapter's. Prose in the contract files
+# and the validators may therefore use ``consumer`` freely; the scan is for the adapter's
+# machinery, and only in the files that declare or implement the contract.
 FORBIDDEN_VOCABULARY = (
     "xadd",
     "xreadgroup",
     "xack",
     "xautoclaim",
     "xgroup",
+    "xautoclave",
+    "group",
+    "stream",
     "delivery_count",
     "redis",
 )
 
 # The only version this contract ships (design.md §7.1); a different literal is a contract change.
 ENVELOPE_TYPE_V1 = "mediaforge.job.dispatch.v1"
+
+# The schema's machine-checkable year-domain statement: the instant domain is years
+# 0001-9999, because RFC 3339's ABNF admits any four-digit year lexically while the ISO 8601
+# calendar it delegates to has no year 0000, and Python's ``datetime`` cannot represent year
+# 0 at all. The pattern is a narrow negative prefix check on purpose: ``format: date-time``
+# stays the grammar and the calendar, and this suite does not apply the pattern at all -- the
+# validator's gate 2 (``fromisoformat``) supplies the same exclusion -- so the constant pins
+# the schema's statement so a drifted pattern fails both suites instead of quietly moving the
+# domain.
+OCCURRED_AT_PATTERN = r"^(?!0000)"
 
 # A v1 envelope that is valid by construction; every rejection test disturbs exactly one property.
 ENVELOPE_V1: dict[str, str] = {
@@ -354,9 +372,23 @@ def test_schema_declares_the_contracts_semantics() -> None:
     assert isinstance(type_decl, dict), "properties.type must be an object"
     assert type_decl.get("const") == ENVELOPE_TYPE_V1
 
+    # The two value fields keep their declared scalar kind in the schema; a job_id that
+    # stopped being a string (or an occurred_at that became something else) is a contract
+    # change that neither fixture could notice, because the validators enforce their own
+    # types independently of the schema file.
+    job_id_decl = properties["job_id"]
+    assert isinstance(job_id_decl, dict), "properties.job_id must be an object"
+    assert job_id_decl.get("type") == "string"
+
     occurred_at_decl = properties["occurred_at"]
     assert isinstance(occurred_at_decl, dict), "properties.occurred_at must be an object"
+    assert occurred_at_decl.get("type") == "string"
     assert occurred_at_decl.get("format") == "date-time"
+    # The year-domain statement is narrowed by a pattern, not by replacing the format:
+    # ``format: date-time`` stays the shape gate and the pattern excludes a date beginning
+    # 0000. Pinning the exact string keeps the schema and both suites honest about the
+    # domain being years 0001-9999.
+    assert occurred_at_decl.get("pattern") == OCCURRED_AT_PATTERN
 
 
 def test_no_broker_vocabulary_in_the_contract_or_validator_files() -> None:

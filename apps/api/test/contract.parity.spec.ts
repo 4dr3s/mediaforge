@@ -54,14 +54,19 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /**
  * The Redis adapter vocabulary that must never reach the domain contract (C3: the queue port
- * is broker-agnostic). The list names Redis machinery only -- `xadd`, `xreadgroup`, `xack` and
- * `xautoclaim` are stream commands, `xgroup` the group machinery, `delivery_count` a message
- * field, and `redis` the broker itself. Words like `consumer`, `group` or `stream` are
- * deliberately absent: the specification itself calls the two runtimes "consumers" (C3's "the
- * Python consumer"), so banning them would outlaw the domain's own vocabulary, not the
- * adapter's. Prose in the contract files and the validators may therefore use the domain's
- * words freely; the scan is for the adapter's machinery, and only in the files that declare
- * or implement the contract.
+ * is broker-agnostic). The list names the adapter's machinery, not the domain's actors:
+ * `xadd`, `xreadgroup`, `xack`, `xautoclaim` and `xgroup` are stream commands and group
+ * machinery, `delivery_count` a message field of the adapter, `redis` the broker itself, and
+ * `stream` and `group` the machinery those commands operate on -- the domain contract has no
+ * legitimate use for any of them (C3's own constraint forbids the contract naming "Redis,
+ * streams, groups or claims"). `xautoclave` is the dispatch checklist's deliberately
+ * misspelled variant, kept on purpose: the scan is vocabulary-presence, not spelling, and a
+ * contract file containing either spelling is a leak. What is deliberately absent is
+ * `consumer`: the specification itself calls the two runtimes "consumers" (C3's "the Python
+ * consumer"), and the Python validator legitimately uses the word, so banning it would
+ * outlaw the domain's own actor word, not the adapter's. Prose in the contract files and the
+ * validators may therefore use `consumer` freely; the scan is for the adapter's machinery,
+ * and only in the files that declare or implement the contract.
  */
 const FORBIDDEN_VOCABULARY = [
   'xadd',
@@ -69,12 +74,27 @@ const FORBIDDEN_VOCABULARY = [
   'xack',
   'xautoclaim',
   'xgroup',
+  'xautoclave',
+  'group',
+  'stream',
   'delivery_count',
   'redis',
 ];
 
 /** The only version this contract ships (design.md §7.1); a different literal is a contract change. */
 const ENVELOPE_TYPE_V1 = 'mediaforge.job.dispatch.v1';
+
+/**
+ * The schema's machine-checkable year-domain statement: the instant domain is years
+ * 0001-9999, because RFC 3339's ABNF admits any four-digit year lexically while the ISO 8601
+ * calendar it delegates to has no year 0000, and Python's `datetime` cannot represent year 0
+ * at all. The pattern is a narrow negative prefix check on purpose: `format: date-time`
+ * stays the grammar and the calendar, and restating the grammar here would be a fourth copy
+ * of it -- a copy that could not check the calendar, so it would look like the definition of
+ * the field while accepting February 30th. Pinned here so a drifted pattern fails both
+ * suites instead of quietly moving the domain.
+ */
+const OCCURRED_AT_PATTERN = '^(?!0000)';
 
 /** A v1 envelope that is valid by construction; every rejection test disturbs exactly one property. */
 const ENVELOPE_V1 = {
@@ -331,7 +351,7 @@ describe('dispatch-envelope.schema.json :: the contract C3 names, asserted on di
       type: unknown;
       additionalProperties: unknown;
       required: unknown;
-      properties: Record<string, { const?: unknown; format?: unknown }>;
+      properties: Record<string, { const?: unknown; format?: unknown; pattern?: unknown; type?: unknown }>;
     };
 
     // The facts the rest of this file asserts after parsing are asserted here against the
@@ -343,7 +363,18 @@ describe('dispatch-envelope.schema.json :: the contract C3 names, asserted on di
     expect([...(schema.required as unknown[])].sort()).toEqual(['job_id', 'occurred_at', 'type']);
     expect(Object.keys(schema.properties).sort()).toEqual(['job_id', 'occurred_at', 'type']);
     expect(schema.properties.type.const).toBe(ENVELOPE_TYPE_V1);
+    // The two value fields keep their declared scalar kind in the schema; a job_id that
+    // stopped being a string (or an occurred_at that became something else) is a contract
+    // change that neither fixture could notice, because the validators enforce their own
+    // types independently of the schema file.
+    expect(schema.properties.job_id.type).toBe('string');
+    expect(schema.properties.occurred_at.type).toBe('string');
     expect(schema.properties.occurred_at.format).toBe('date-time');
+    // The year-domain statement is narrowed by a pattern, not by replacing the format:
+    // `format: date-time` stays the shape gate and the pattern excludes a date beginning
+    // 0000. Pinning the exact string keeps the schema and both suites honest about the
+    // domain being years 0001-9999.
+    expect(schema.properties.occurred_at.pattern).toBe(OCCURRED_AT_PATTERN);
   });
 });
 

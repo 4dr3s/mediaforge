@@ -14,6 +14,12 @@ RFC 3339 *grammar* (mandatory time offset with a ``:`` separator, seconds always
 and ``datetime.fromisoformat`` supplies the *calendar and offset-range* gate the grammar alone
 cannot — February 30th, month 13, a non-leap February 29th and a ``+24:00`` offset all match
 the regex but contradict the calendar. Neither gate alone would be correct.
+
+The instant domain is years 0001–9999. RFC 3339's ABNF admits any 4-digit year lexically
+while delegating the calendar to ISO 8601, whose calendar has no year 0000, and ``datetime``
+cannot represent year 0 at all — so a ``0000-`` timestamp matches the grammar gate and fails
+the calendar gate. Gate 2 is what supplies the year-domain exclusion, mirroring the zod
+validator's own rejection of year 0000.
 """
 
 from __future__ import annotations
@@ -84,7 +90,10 @@ class DispatchEnvelope(pydantic.BaseModel):
         # that the calendar itself rejects; ``fromisoformat`` is the measured calendar gate
         # (Python >= 3.11, which this package requires, accepts the ``Z`` suffix). It runs
         # only after the grammar gate, because on its own it would accept forms RFC 3339 does
-        # not — for example ``2026-09-17T12:00:00+0000``, an offset without the colon.
+        # not — for example ``2026-09-17T12:00:00+0000``, an offset without the colon. Gate 2
+        # is also what supplies the year-domain exclusion: the instant domain is years
+        # 0001–9999 (the ISO 8601 calendar has no year 0000), so a ``0000-`` timestamp passes
+        # the grammar gate above and falls here, where ``datetime`` cannot represent year 0.
         try:
             dt.datetime.fromisoformat(value)
         except ValueError as exc:
