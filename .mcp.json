@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "open-pencil": {
+      "command": "openpencil-mcp",
+      "env": {
+        "OPENPENCIL_MCP_ROOT": "apps/web/design"
+      },
+      "lifecycle": "lazy"
+    }
+  }
+}
